@@ -125,8 +125,35 @@ impl OpenApiType for String {
     }
 }
 
+impl OpenApiType for u32 {
+    fn schema() -> Schema {
+        Schema {
+            type_: Some("integer".into()),
+            ..Default::default()
+        }
+    }
+}
+
+impl OpenApiType for bool {
+    fn schema() -> Schema {
+        Schema {
+            type_: Some("boolean".into()),
+            ..Default::default()
+        }
+    }
+}
+
 impl<T: OpenApiType> OpenApiType for Option<T> {
     fn schema() -> Schema {
         T::schema()
+    }
+}
+
+impl<T: OpenApiType> OpenApiType for Vec<T> {
+    fn schema() -> Schema {
+        Schema {
+            type_: Some("array".into()),
+            ..Default::default()
+        }
     }
 }

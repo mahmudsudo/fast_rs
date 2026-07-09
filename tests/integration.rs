@@ -2,7 +2,7 @@ use fastrs::{get, post, App, Json, Query, OpenApi};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 use tower::ServiceExt;
-use axum::{
+use fastrs::axum::{
     body::Body,
     http::{Request, StatusCode},
 };
@@ -43,6 +43,11 @@ async fn list_users(query: Query<UserQuery>) -> Json<Vec<UserResponse>> {
     }])
 }
 
+async fn body_bytes(body: Body) -> bytes::Bytes {
+    use http_body_util::BodyExt;
+    body.collect().await.unwrap().to_bytes()
+}
+
 #[tokio::test]
 async fn test_valid_request() {
     let app = App::new().route(create_user).into_router();
@@ -60,9 +65,9 @@ async fn test_valid_request() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
-    
-    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
+
+    let bytes = body_bytes(response.into_body()).await;
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(body["id"], 1);
     assert_eq!(body["email"], "valid@email.com");
 }
@@ -84,17 +89,14 @@ async fn test_invalid_json_request_validation() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
-    
-    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-    
+
+    let bytes = body_bytes(response.into_body()).await;
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+
     let errors = body["errors"].as_array().unwrap();
     assert_eq!(errors.len(), 2);
-    
-    let has_email = errors.iter().any(|e| e["field"] == "email");
-    let has_password = errors.iter().any(|e| e["field"] == "password");
-    assert!(has_email);
-    assert!(has_password);
+    assert!(errors.iter().any(|e| e["field"] == "email"));
+    assert!(errors.iter().any(|e| e["field"] == "password"));
 }
 
 #[tokio::test]
@@ -105,7 +107,7 @@ async fn test_query_validation() {
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/users?page=0") // invalid, min=1
+                .uri("/users?page=0") // invalid: min = 1
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -113,10 +115,10 @@ async fn test_query_validation() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
-    
-    let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
-    let body: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
-    
+
+    let bytes = body_bytes(response.into_body()).await;
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+
     let errors = body["errors"].as_array().unwrap();
     assert_eq!(errors.len(), 1);
     assert_eq!(errors[0]["field"], "page");
