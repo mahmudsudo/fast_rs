@@ -64,6 +64,20 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
         self
     }
 
+    pub fn nest(mut self, path: &str, app: App<S>) -> Self {
+        self.router = self.router.nest(path, app.router);
+        
+        for (sub_path, operations) in app.openapi.paths {
+            let full_path = format!("{}{}", path, if sub_path == "/" { "" } else { &sub_path });
+            let path_item = self.openapi.paths.entry(full_path).or_default();
+            for (method, op) in operations {
+                path_item.insert(method, op);
+            }
+        }
+        
+        self
+    }
+
     pub fn with_state(self, state: S) -> App<()> {
         App {
             router: self.router.with_state(state),
