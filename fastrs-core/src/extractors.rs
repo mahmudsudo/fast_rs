@@ -2,6 +2,7 @@ use axum::{
     extract::{FromRequest, FromRequestParts, Request},
     response::{IntoResponse, Response},
 };
+pub use axum::extract::State;
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::BTreeMap;
 use validator::Validate;

@@ -8,36 +8,37 @@ pub enum Method {
     Delete,
 }
 
-pub struct RouteDef {
+pub struct RouteDef<S = ()> {
     pub path: &'static str,
     pub method: Method,
-    pub router: MethodRouter,
+    pub router: MethodRouter<S>,
     pub operation: Operation,
 }
 
-pub struct App {
-    router: Router,
-    openapi: OpenApi,
+pub struct App<S = ()> {
+    router: Router<S>,
+    pub openapi: OpenApi,
 }
 
-impl Default for App {
+impl Default for App<()> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl App {
+impl App<()> {
     pub fn new() -> Self {
         Self {
             router: Router::new(),
             openapi: OpenApi::new(),
         }
     }
+}
 
-    pub fn route(mut self, route_def: fn() -> RouteDef) -> Self {
+impl<S: Clone + Send + Sync + 'static> App<S> {
+    pub fn route(mut self, route_def: fn() -> RouteDef<S>) -> Self {
         let def = route_def();
         
-        // Convert OpenAPI format /users/{id} to Axum format /users/:id
         let mut axum_path = def.path.to_string();
         while let Some(start) = axum_path.find('{') {
             if let Some(end) = axum_path[start..].find('}') {
@@ -61,6 +62,13 @@ impl App {
         path_item.insert(method_str.to_string(), def.operation);
 
         self
+    }
+
+    pub fn with_state(self, state: S) -> App<()> {
+        App {
+            router: self.router.with_state(state),
+            openapi: self.openapi,
+        }
     }
 
     pub fn serve_docs_at(mut self, path: &'static str) -> Self {
@@ -102,15 +110,17 @@ impl App {
         self
     }
 
+    pub fn into_router(self) -> Router<S> {
+        self.router
+    }
+}
+
+impl App<()> {
     pub fn run(self, addr: &str) {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
             axum::serve(listener, self.router).await.unwrap();
         });
-    }
-
-    pub fn into_router(self) -> Router {
-        self.router
     }
 }

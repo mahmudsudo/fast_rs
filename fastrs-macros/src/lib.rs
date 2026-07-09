@@ -150,7 +150,10 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
 
     let expanded = quote! {
         #[allow(non_camel_case_types)]
-        pub fn #orig_name() -> fastrs::RouteDef {
+        pub fn #orig_name<S>() -> fastrs::RouteDef<S>
+        where
+            S: Clone + Send + Sync + 'static,
+        {
             #func
 
             let mut op = fastrs::Operation::default();
