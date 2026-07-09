@@ -38,11 +38,7 @@ where
             .map_err(|e| e.into_response())?;
 
         value.validate().map_err(|e| {
-            (
-                axum::http::StatusCode::UNPROCESSABLE_ENTITY,
-                axum::Json(e),
-            )
-                .into_response()
+            crate::error::ApiError::Validation(e).into_response()
         })?;
 
         Ok(Json(value))
