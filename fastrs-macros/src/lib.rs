@@ -13,47 +13,48 @@ pub fn derive_openapi(input: TokenStream) -> TokenStream {
     let mut required = Vec::new();
 
     if let syn::Data::Struct(data) = input.data
-        && let syn::Fields::Named(fields) = data.fields {
-            for field in fields.named {
-                let field_name = field.ident.unwrap();
-                let field_name_str = field_name.to_string();
-                required.push(field_name_str.clone());
+        && let syn::Fields::Named(fields) = data.fields
+    {
+        for field in fields.named {
+            let field_name = field.ident.unwrap();
+            let field_name_str = field_name.to_string();
+            required.push(field_name_str.clone());
 
-                let ty = field.ty;
+            let ty = field.ty;
 
-                let mut format_opt = quote! { None };
-                let mut min_length_opt = quote! { None };
+            let mut format_opt = quote! { None };
+            let mut min_length_opt = quote! { None };
 
-                for attr in field.attrs {
-                    if attr.path().is_ident("validate") {
-                        let _ = attr.parse_nested_meta(|meta| {
-                            if meta.path.is_ident("email") {
-                                format_opt = quote! { Some("email".to_string()) };
-                            } else if meta.path.is_ident("length") {
-                                let _ = meta.parse_nested_meta(|inner_meta| {
-                                    if inner_meta.path.is_ident("min") {
-                                        let lit: syn::LitInt = inner_meta.value()?.parse()?;
-                                        let val = lit.base10_parse::<usize>()?;
-                                        min_length_opt = quote! { Some(#val) };
-                                    }
-                                    Ok(())
-                                });
-                            }
-                            Ok(())
-                        });
-                    }
+            for attr in field.attrs {
+                if attr.path().is_ident("validate") {
+                    let _ = attr.parse_nested_meta(|meta| {
+                        if meta.path.is_ident("email") {
+                            format_opt = quote! { Some("email".to_string()) };
+                        } else if meta.path.is_ident("length") {
+                            let _ = meta.parse_nested_meta(|inner_meta| {
+                                if inner_meta.path.is_ident("min") {
+                                    let lit: syn::LitInt = inner_meta.value()?.parse()?;
+                                    let val = lit.base10_parse::<usize>()?;
+                                    min_length_opt = quote! { Some(#val) };
+                                }
+                                Ok(())
+                            });
+                        }
+                        Ok(())
+                    });
                 }
-
-                properties.push(quote! {
-                    {
-                        let mut schema = <#ty as fastrs::OpenApiType>::schema();
-                        if let Some(f) = #format_opt { schema.format = Some(f); }
-                        if let Some(m) = #min_length_opt { schema.min_length = Some(m); }
-                        props.insert(#field_name_str.to_string(), schema);
-                    }
-                });
             }
+
+            properties.push(quote! {
+                {
+                    let mut schema = <#ty as fastrs::OpenApiType>::schema();
+                    if let Some(f) = #format_opt { schema.format = Some(f); }
+                    if let Some(m) = #min_length_opt { schema.min_length = Some(m); }
+                    props.insert(#field_name_str.to_string(), schema);
+                }
+            });
         }
+    }
 
     let expanded = quote! {
         impl fastrs::OpenApiType for #name {
@@ -93,31 +94,32 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
             let mut is_path = false;
             if let Type::Path(type_path) = &**ty
                 && let Some(segment) = type_path.path.segments.last()
-                    && segment.ident == "Path" {
-                        is_path = true;
-                    }
+                && segment.ident == "Path"
+            {
+                is_path = true;
+            }
 
             if is_path {
                 if let Pat::TupleStruct(tuple_pat) = &**pat
-                    && let Some(Pat::Ident(PatIdent { ident, .. })) = tuple_pat.elems.first() {
-                        let param_name = ident.to_string();
-                        // wait, the inner type of Path<T>
-                        if let Type::Path(type_path) = &**ty
-                            && let Some(segment) = type_path.path.segments.last()
-                                && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
-                                    && let Some(syn::GenericArgument::Type(inner_ty)) =
-                                        args.args.first()
-                                    {
-                                        path_params.push(quote! {
-                                            op.parameters.push(fastrs::Parameter {
-                                                name: #param_name.to_string(),
-                                                in_: "path".to_string(),
-                                                required: true,
-                                                schema: <#inner_ty as fastrs::OpenApiType>::schema(),
-                                            });
-                                        });
-                                    }
+                    && let Some(Pat::Ident(PatIdent { ident, .. })) = tuple_pat.elems.first()
+                {
+                    let param_name = ident.to_string();
+                    // wait, the inner type of Path<T>
+                    if let Type::Path(type_path) = &**ty
+                        && let Some(segment) = type_path.path.segments.last()
+                        && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+                        && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+                    {
+                        path_params.push(quote! {
+                            op.parameters.push(fastrs::Parameter {
+                                name: #param_name.to_string(),
+                                in_: "path".to_string(),
+                                required: true,
+                                schema: <#inner_ty as fastrs::OpenApiType>::schema(),
+                            });
+                        });
                     }
+                }
             } else {
                 extractor_calls.push(quote! {
                     <#ty as fastrs::OpenApiExtractor>::modify_operation(&mut op);
