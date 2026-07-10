@@ -1,6 +1,6 @@
 # fastrs
 
-A FastAPI-equivalent framework for Rust, built as a thin ergonomics layer on top of Axum. It delivers automatic request validation, auto-generated OpenAPI docs, and minimal boilerplate—with zero runtime overhead.
+A FastAPI-equivalent framework for Rust, built as a thin ergonomics layer on top of Axum. It delivers automatic request validation, auto-generated OpenAPI docs, and minimal boilerplate with zero runtime overhead.
 
 ## Quickstart
 
