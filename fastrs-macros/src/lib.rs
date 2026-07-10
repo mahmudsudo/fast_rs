@@ -12,8 +12,8 @@ pub fn derive_openapi(input: TokenStream) -> TokenStream {
     let mut properties = Vec::new();
     let mut required = Vec::new();
 
-    if let syn::Data::Struct(data) = input.data {
-        if let syn::Fields::Named(fields) = data.fields {
+    if let syn::Data::Struct(data) = input.data
+        && let syn::Fields::Named(fields) = data.fields {
             for field in fields.named {
                 let field_name = field.ident.unwrap();
                 let field_name_str = field_name.to_string();
@@ -54,7 +54,6 @@ pub fn derive_openapi(input: TokenStream) -> TokenStream {
                 });
             }
         }
-    }
 
     let expanded = quote! {
         impl fastrs::OpenApiType for #name {
@@ -92,24 +91,21 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
         if let FnArg::Typed(PatType { ty, pat, .. }) = arg {
             // Check if type is Path
             let mut is_path = false;
-            if let Type::Path(type_path) = &**ty {
-                if let Some(segment) = type_path.path.segments.last() {
-                    if segment.ident == "Path" {
+            if let Type::Path(type_path) = &**ty
+                && let Some(segment) = type_path.path.segments.last()
+                    && segment.ident == "Path" {
                         is_path = true;
                     }
-                }
-            }
 
             if is_path {
-                if let Pat::TupleStruct(tuple_pat) = &**pat {
-                    if let Some(Pat::Ident(PatIdent { ident, .. })) = tuple_pat.elems.first() {
+                if let Pat::TupleStruct(tuple_pat) = &**pat
+                    && let Some(Pat::Ident(PatIdent { ident, .. })) = tuple_pat.elems.first() {
                         let param_name = ident.to_string();
                         // wait, the inner type of Path<T>
-                        if let Type::Path(type_path) = &**ty {
-                            if let Some(segment) = type_path.path.segments.last() {
-                                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
-                                {
-                                    if let Some(syn::GenericArgument::Type(inner_ty)) =
+                        if let Type::Path(type_path) = &**ty
+                            && let Some(segment) = type_path.path.segments.last()
+                                && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+                                    && let Some(syn::GenericArgument::Type(inner_ty)) =
                                         args.args.first()
                                     {
                                         path_params.push(quote! {
@@ -121,11 +117,7 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
                                             });
                                         });
                                     }
-                                }
-                            }
-                        }
                     }
-                }
             } else {
                 extractor_calls.push(quote! {
                     <#ty as fastrs::OpenApiExtractor>::modify_operation(&mut op);
