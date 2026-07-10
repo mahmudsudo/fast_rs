@@ -1,13 +1,15 @@
+pub use axum::extract::State;
 use axum::{
     extract::{FromRequest, FromRequestParts, Request},
     response::{IntoResponse, Response},
 };
-pub use axum::extract::State;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use std::collections::BTreeMap;
 use validator::Validate;
 
-use crate::openapi::{MediaType, OpenApiExtractor, OpenApiResponder, OpenApiType, Operation, RequestBody};
+use crate::openapi::{
+    MediaType, OpenApiExtractor, OpenApiResponder, OpenApiType, Operation, RequestBody,
+};
 
 pub struct Json<T>(pub T);
 
@@ -38,9 +40,9 @@ where
             .await
             .map_err(|e| e.into_response())?;
 
-        value.validate().map_err(|e| {
-            crate::error::ApiError::Validation(e).into_response()
-        })?;
+        value
+            .validate()
+            .map_err(|e| crate::error::ApiError::Validation(e).into_response())?;
 
         Ok(Json(value))
     }
@@ -130,13 +132,14 @@ where
         parts: &mut axum::http::request::Parts,
         state: &S,
     ) -> Result<Self, Self::Rejection> {
-        let axum::extract::Query(value) = axum::extract::Query::<T>::from_request_parts(parts, state)
-            .await
-            .map_err(|e| e.into_response())?;
+        let axum::extract::Query(value) =
+            axum::extract::Query::<T>::from_request_parts(parts, state)
+                .await
+                .map_err(|e| e.into_response())?;
 
-        value.validate().map_err(|e| {
-            crate::error::ApiError::Validation(e).into_response()
-        })?;
+        value
+            .validate()
+            .map_err(|e| crate::error::ApiError::Validation(e).into_response())?;
 
         Ok(Query(value))
     }
@@ -189,11 +192,13 @@ where
         })?;
 
         let value_str = value.to_str().map_err(|_| {
-            crate::error::ApiError::BadRequest(format!("Invalid header encoding: {}", name)).into_response()
+            crate::error::ApiError::BadRequest(format!("Invalid header encoding: {}", name))
+                .into_response()
         })?;
 
         let parsed = value_str.parse::<V>().map_err(|_| {
-            crate::error::ApiError::BadRequest(format!("Invalid header format: {}", name)).into_response()
+            crate::error::ApiError::BadRequest(format!("Invalid header format: {}", name))
+                .into_response()
         })?;
 
         Ok(Header(parsed, std::marker::PhantomData))

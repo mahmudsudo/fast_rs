@@ -1,12 +1,15 @@
-pub mod extractors;
-pub mod openapi;
 pub mod app;
 pub mod error;
+pub mod extractors;
+pub mod openapi;
 
-pub use extractors::{Json, Path, Query, Header, HeaderName, State};
-pub use openapi::{OpenApiType, OpenApiExtractor, OpenApiResponder, Schema, Operation, Parameter, RequestBody, Response, MediaType, OpenApi};
-pub use app::{App, RouteDef, Method};
+pub use app::{App, Method, RouteDef};
 pub use error::{ApiError, IntoApiError};
+pub use extractors::{Header, HeaderName, Json, Path, Query, State};
+pub use openapi::{
+    MediaType, OpenApi, OpenApiExtractor, OpenApiResponder, OpenApiType, Operation, Parameter,
+    RequestBody, Response, Schema,
+};
 
 #[doc(hidden)]
 pub use axum;

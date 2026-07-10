@@ -1,5 +1,5 @@
 use crate::openapi::{OpenApi, Operation};
-use axum::{routing::MethodRouter, Router};
+use axum::{Router, routing::MethodRouter};
 
 pub enum Method {
     Get,
@@ -38,12 +38,12 @@ impl App<()> {
 impl<S: Clone + Send + Sync + 'static> App<S> {
     pub fn route(mut self, route_def: fn() -> RouteDef<S>) -> Self {
         let def = route_def();
-        
+
         let mut axum_path = def.path.to_string();
         while let Some(start) = axum_path.find('{') {
             if let Some(end) = axum_path[start..].find('}') {
                 let end = start + end;
-                let param_name = &axum_path[start+1..end].to_string();
+                let param_name = &axum_path[start + 1..end].to_string();
                 axum_path.replace_range(start..=end, &format!(":{}", param_name));
             } else {
                 break;
@@ -66,7 +66,7 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
 
     pub fn nest(mut self, path: &str, app: App<S>) -> Self {
         self.router = self.router.nest(path, app.router);
-        
+
         for (sub_path, operations) in app.openapi.paths {
             let full_path = format!("{}{}", path, if sub_path == "/" { "" } else { &sub_path });
             let path_item = self.openapi.paths.entry(full_path).or_default();
@@ -74,7 +74,7 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
                 path_item.insert(method, op);
             }
         }
-        
+
         self
     }
 
@@ -87,15 +87,21 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
 
     pub fn serve_docs_at(mut self, path: &'static str) -> Self {
         let openapi_json = serde_json::to_string(&self.openapi).unwrap();
-        
+
         let json_path = format!("{}/openapi.json", path);
         let openapi_json_cloned = openapi_json.clone();
-        
-        self.router = self.router.route(&json_path, axum::routing::get(move || async move {
-            axum::response::Json(serde_json::from_str::<serde_json::Value>(&openapi_json_cloned).unwrap())
-        }));
 
-        let html = format!(r#"
+        self.router = self.router.route(
+            &json_path,
+            axum::routing::get(move || async move {
+                axum::response::Json(
+                    serde_json::from_str::<serde_json::Value>(&openapi_json_cloned).unwrap(),
+                )
+            }),
+        );
+
+        let html = format!(
+            r#"
 <!DOCTYPE html>
 <html>
 <head>
@@ -115,11 +121,14 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
     </script>
 </body>
 </html>
-        "#, json_path);
-        
-        self.router = self.router.route(path, axum::routing::get(move || async move {
-            axum::response::Html(html)
-        }));
+        "#,
+            json_path
+        );
+
+        self.router = self.router.route(
+            path,
+            axum::routing::get(move || async move { axum::response::Html(html) }),
+        );
 
         self
     }

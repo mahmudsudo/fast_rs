@@ -1,11 +1,11 @@
-use fastrs::{get, post, App, Json, Query, OpenApi};
-use serde::{Deserialize, Serialize};
-use validator::Validate;
-use tower::ServiceExt;
 use fastrs::axum::{
     body::Body,
     http::{Request, StatusCode},
 };
+use fastrs::{App, Json, OpenApi, Query, get, post};
+use serde::{Deserialize, Serialize};
+use tower::ServiceExt;
+use validator::Validate;
 
 #[derive(Deserialize, Validate, OpenApi)]
 struct CreateUser {
@@ -58,7 +58,9 @@ async fn test_valid_request() {
                 .method("POST")
                 .uri("/users")
                 .header("content-type", "application/json")
-                .body(Body::from(r#"{"email": "valid@email.com", "password": "password123"}"#))
+                .body(Body::from(
+                    r#"{"email": "valid@email.com", "password": "password123"}"#,
+                ))
                 .unwrap(),
         )
         .await

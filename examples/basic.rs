@@ -1,4 +1,4 @@
-use fastrs::{get, post, Json, Path, OpenApi};
+use fastrs::{Json, OpenApi, Path, get, post};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
@@ -18,12 +18,18 @@ struct UserResponse {
 
 #[post("/users")]
 async fn create_user(body: Json<CreateUser>) -> Json<UserResponse> {
-    Json(UserResponse { id: 1, email: body.email.clone() })
+    Json(UserResponse {
+        id: 1,
+        email: body.email.clone(),
+    })
 }
 
 #[get("/users/{id}")]
 async fn get_user(Path(id): Path<u64>) -> Json<UserResponse> {
-    Json(UserResponse { id, email: "x@y.com".into() })
+    Json(UserResponse {
+        id,
+        email: "x@y.com".into(),
+    })
 }
 
 fn main() {

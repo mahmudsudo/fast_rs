@@ -1,6 +1,8 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, ItemFn, LitStr, ReturnType, Type, FnArg, PatType, Pat, PatIdent};
+use syn::{
+    DeriveInput, FnArg, ItemFn, LitStr, Pat, PatIdent, PatType, ReturnType, Type, parse_macro_input,
+};
 
 #[proc_macro_derive(OpenApi, attributes(validate))]
 pub fn derive_openapi(input: TokenStream) -> TokenStream {
@@ -16,9 +18,9 @@ pub fn derive_openapi(input: TokenStream) -> TokenStream {
                 let field_name = field.ident.unwrap();
                 let field_name_str = field_name.to_string();
                 required.push(field_name_str.clone());
-                
+
                 let ty = field.ty;
-                
+
                 let mut format_opt = quote! { None };
                 let mut min_length_opt = quote! { None };
 
@@ -77,7 +79,7 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
     let path_str = path.value();
     let mut func = parse_macro_input!(item as ItemFn);
     let orig_name = func.sig.ident.clone();
-    
+
     // We rename the inner function
     let inner_name = syn::Ident::new(&format!("__fastrs_inner_{}", orig_name), orig_name.span());
     func.sig.ident = inner_name.clone();
@@ -97,7 +99,7 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
                     }
                 }
             }
-            
+
             if is_path {
                 if let Pat::TupleStruct(tuple_pat) = &**pat {
                     if let Some(Pat::Ident(PatIdent { ident, .. })) = tuple_pat.elems.first() {
@@ -105,8 +107,11 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
                         // wait, the inner type of Path<T>
                         if let Type::Path(type_path) = &**ty {
                             if let Some(segment) = type_path.path.segments.last() {
-                                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments {
-                                    if let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first() {
+                                if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+                                {
+                                    if let Some(syn::GenericArgument::Type(inner_ty)) =
+                                        args.args.first()
+                                    {
                                         path_params.push(quote! {
                                             op.parameters.push(fastrs::Parameter {
                                                 name: #param_name.to_string(),
