@@ -23,6 +23,7 @@ pub struct ErrorResponse {
 #[derive(Debug)]
 pub enum ApiError {
     NotFound(String),
+    Unauthorized(String),
     BadRequest(String),
     InternalServerError(String),
     Validation(ValidationErrors),
@@ -51,6 +52,13 @@ impl IntoResponse for ApiError {
             ),
             ApiError::BadRequest(msg) => (
                 StatusCode::BAD_REQUEST,
+                ErrorResponse {
+                    message: Some(msg),
+                    errors: None,
+                },
+            ),
+            ApiError::Unauthorized(msg) => (
+                StatusCode::UNAUTHORIZED,
                 ErrorResponse {
                     message: Some(msg),
                     errors: None,

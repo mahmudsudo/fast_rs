@@ -1,10 +1,16 @@
 use crate::openapi::{OpenApi, Operation};
 use axum::{Router, routing::MethodRouter};
+use tower_http::{
+    cors::CorsLayer,
+    trace::{TraceLayer, DefaultOnFailure, OnFailure},
+    classify::MakeClassifier,
+};
 
 pub enum Method {
     Get,
     Post,
     Put,
+    Patch,
     Delete,
 }
 
@@ -26,16 +32,13 @@ impl Default for App<()> {
     }
 }
 
-impl App<()> {
+impl<S: Clone + Send + Sync + 'static> App<S> {
     pub fn new() -> Self {
         Self {
             router: Router::new(),
             openapi: OpenApi::new(),
         }
     }
-}
-
-impl<S: Clone + Send + Sync + 'static> App<S> {
     pub fn route(mut self, route_def: fn() -> RouteDef<S>) -> Self {
         let def = route_def();
 
@@ -57,6 +60,7 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
             Method::Get => "get",
             Method::Post => "post",
             Method::Put => "put",
+            Method::Patch => "patch",
             Method::Delete => "delete",
         };
         path_item.insert(method_str.to_string(), def.operation);
@@ -78,11 +82,21 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
         self
     }
 
-    pub fn with_state(self, state: S) -> App<()> {
-        App {
-            router: self.router.with_state(state),
-            openapi: self.openapi,
-        }
+   pub fn with_state(self, state: S) -> App<()> {
+    App {
+        router: self.router.with_state(state),
+        openapi: self.openapi,
+    }
+}
+
+    pub fn with_cors(mut self, layer: CorsLayer) -> Self {
+        self.router = self.router.layer(layer);
+        self
+    }
+
+    pub fn with_tracing<L: std::clone::Clone+std::marker::Send+tower_http::classify::MakeClassifier+ 'static>(mut self, layer: TraceLayer<L>) -> Self where <L as MakeClassifier>::ClassifyEos: Send, DefaultOnFailure: OnFailure<<L as MakeClassifier>::FailureClass>, <L as MakeClassifier>::Classifier: Clone + Send, <L as MakeClassifier>::Classifier: 'static, <L as MakeClassifier>::ClassifyEos: 'static {
+        self.router = self.router.layer(layer);
+        self
     }
 
     pub fn serve_docs_at(mut self, path: &'static str) -> Self {
@@ -139,11 +153,8 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
 }
 
 impl App<()> {
-    pub fn run(self, addr: &str) {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-            axum::serve(listener, self.router).await.unwrap();
-        });
+    pub async fn run(self, addr: &str) {
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        axum::serve(listener, self.router).await.unwrap();
     }
 }

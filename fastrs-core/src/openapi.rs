@@ -107,6 +107,15 @@ impl OpenApiType for u64 {
     }
 }
 
+impl OpenApiType for i64 {
+    fn schema() -> Schema {
+        Schema {
+            type_: Some("integer".into()),
+            ..Default::default()
+        }
+    }
+}
+
 impl OpenApiType for i32 {
     fn schema() -> Schema {
         Schema {
@@ -153,6 +162,15 @@ impl<T: OpenApiType> OpenApiType for Vec<T> {
     fn schema() -> Schema {
         Schema {
             type_: Some("array".into()),
+            ..Default::default()
+        }
+    }
+}
+
+impl OpenApiType for serde_json::Value {
+    fn schema() -> Schema {
+        Schema {
+            type_: Some("object".into()),
             ..Default::default()
         }
     }

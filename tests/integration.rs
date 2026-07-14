@@ -1,8 +1,9 @@
 use fastrs::axum::{
+    async_trait,
     body::Body,
     http::{Request, StatusCode},
 };
-use fastrs::{App, Json, OpenApi, Query, get, post};
+use fastrs::{App, AuthVerifier, Bearer, Json, OpenApi, Query, Created, NoContent, Page, Path, get, post, delete};
 use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
 use validator::Validate;
@@ -143,4 +144,228 @@ async fn test_route_nesting() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
+}
+
+// Tests for new v2 features
+
+#[post("/items")]
+async fn create_item(body: Json<CreateUser>) -> Created<Json<UserResponse>> {
+    Created(Json(UserResponse {
+        id: 1,
+        email: body.email.clone(),
+    }))
+}
+
+#[tokio::test]
+async fn test_created_response_code() {
+    let app = App::new().route(create_item).into_router();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/items")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"email": "valid@email.com", "password": "password123"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::CREATED);
+
+    let bytes = body_bytes(response.into_body()).await;
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(body["id"], 1);
+}
+
+#[delete("/items/{id}")]
+async fn delete_item(Path(id): Path<u64>) -> NoContent {
+    let _ = id;
+    NoContent
+}
+
+#[tokio::test]
+async fn test_no_content_response_code() {
+    let app = App::new().route(delete_item).into_router();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("DELETE")
+                .uri("/items/1")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    let bytes = body_bytes(response.into_body()).await;
+    assert!(bytes.is_empty());
+}
+
+#[get("/paginated")]
+async fn get_paginated(page: Page) -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "page": page.page,
+        "limit": page.limit,
+    }))
+}
+
+#[tokio::test]
+async fn test_pagination_defaults() {
+    let app = App::new().route(get_paginated).into_router();
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/paginated")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = body_bytes(response.into_body()).await;
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    
+    assert_eq!(body["page"], 1);
+    assert_eq!(body["limit"], 20);
+}
+
+#[tokio::test]
+async fn test_pagination_custom() {
+    let app = App::new().route(get_paginated).into_router();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/paginated?page=5&limit=50")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = body_bytes(response.into_body()).await;
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    
+    assert_eq!(body["page"], 5);
+    assert_eq!(body["limit"], 50);
+}
+
+#[tokio::test]
+async fn test_pagination_bounds_validation() {
+    let app = App::new().route(get_paginated).into_router();
+
+    // Test page = 0 (invalid)
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/paginated?page=0")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[derive(Clone)]
+struct MockAuthVerifier;
+
+#[async_trait]
+impl AuthVerifier<String> for MockAuthVerifier {
+    type Error = fastrs::ApiError;
+
+    async fn verify(&self, token: &str) -> Result<String, Self::Error> {
+        if token == "valid_token" {
+            Ok("user123".to_string())
+        } else {
+            Err(fastrs::ApiError::Unauthorized("Invalid token".to_string()))
+        }
+    }
+}
+
+#[get("/protected")]
+async fn protected_endpoint(Bearer(user): Bearer<String>) -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "user": user }))
+}
+
+#[tokio::test]
+async fn test_bearer_auth_success() {
+    let app = App::new()
+        .with_state(MockAuthVerifier)
+        .route(protected_endpoint)
+        .into_router();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/protected")
+                .header("Authorization", "Bearer valid_token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let bytes = body_bytes(response.into_body()).await;
+    let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(body["user"], "user123");
+}
+
+#[tokio::test]
+async fn test_bearer_auth_missing_header() {
+    let app = App::new()
+        .with_state(MockAuthVerifier)
+        .route(protected_endpoint)
+        .into_router();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/protected")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn test_bearer_auth_invalid_token() {
+    let app = App::new()
+        .with_state(MockAuthVerifier)
+        .route(protected_endpoint)
+        .into_router();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/protected")
+                .header("Authorization", "Bearer invalid_token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }

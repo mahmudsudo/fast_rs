@@ -87,6 +87,7 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
     // Collect argument types and path parameters
     let mut extractor_calls = Vec::new();
     let mut path_params = Vec::new();
+    let mut state_ty: Option<Type> = None; 
 
     for arg in &func.sig.inputs {
         if let FnArg::Typed(PatType { ty, pat, .. }) = arg {
@@ -94,9 +95,17 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
             let mut is_path = false;
             if let Type::Path(type_path) = &**ty
                 && let Some(segment) = type_path.path.segments.last()
-                && segment.ident == "Path"
             {
-                is_path = true;
+                if segment.ident == "Path" {
+                    is_path = true;
+                } else if segment.ident == "State" {
+                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+                    && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+                {
+                    state_ty = Some(inner_ty.clone());
+                }
+                }
+               
             }
 
             if is_path {
@@ -141,13 +150,34 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
             "get" => "Get",
             "post" => "Post",
             "put" => "Put",
+            "patch" => "Patch",
             "delete" => "Delete",
             _ => "Get",
         },
         proc_macro2::Span::call_site(),
     );
 
-    let expanded = quote! {
+    let expanded = if let Some(state_ty) = state_ty {
+    quote! {
+        #[allow(non_camel_case_types)]
+        pub fn #orig_name() -> fastrs::RouteDef<#state_ty> {
+            #func
+
+            let mut op = fastrs::Operation::default();
+            #(#path_params)*
+            #(#extractor_calls)*
+            #(#responder_calls)*
+
+            fastrs::RouteDef {
+                path: #path_str,
+                method: fastrs::Method::#method_enum,
+                router: fastrs::axum::routing::#method_ident(#inner_name),
+                operation: op,
+            }
+        }
+    }
+} else {
+    quote! {
         #[allow(non_camel_case_types)]
         pub fn #orig_name<S>() -> fastrs::RouteDef<S>
         where
@@ -167,7 +197,10 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
                 operation: op,
             }
         }
-    };
+    }
+};
+
+
 
     TokenStream::from(expanded)
 }
@@ -185,6 +218,11 @@ pub fn post(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn put(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_route("put", attr, item)
+}
+
+#[proc_macro_attribute]
+pub fn patch(attr: TokenStream, item: TokenStream) -> TokenStream {
+    generate_route("patch", attr, item)
 }
 
 #[proc_macro_attribute]

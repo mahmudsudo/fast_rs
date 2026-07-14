@@ -3,10 +3,12 @@ use axum::{
     extract::{FromRequest, FromRequestParts, Request},
     response::{IntoResponse, Response},
 };
+use axum::http::header::AUTHORIZATION;
 use serde::{Serialize, de::DeserializeOwned};
 use std::collections::BTreeMap;
 use validator::Validate;
 
+use crate::error::ApiError;
 use crate::openapi::{
     MediaType, OpenApiExtractor, OpenApiResponder, OpenApiType, Operation, RequestBody,
 };
@@ -80,6 +82,71 @@ impl<T: OpenApiType> OpenApiResponder for Json<T> {
                 content,
             },
         );
+    }
+}
+#[axum::async_trait]
+pub trait AuthVerifier<T>: Send + Sync + 'static {
+    type Error: Into<ApiError>;
+
+    async fn verify(&self, token: &str) -> Result<T, Self::Error>;
+}
+
+pub struct Bearer<T>(pub T);
+
+impl<T> std::ops::Deref for Bearer<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[axum::async_trait]
+impl<T, S> FromRequestParts<S> for Bearer<T>
+where
+    T: Send + Sync + 'static,
+    S: AuthVerifier<T> + Send + Sync,
+{
+    type Rejection = Response;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let auth_header = parts.headers.get(AUTHORIZATION).ok_or_else(|| {
+            ApiError::Unauthorized("Missing Authorization header".to_string()).into_response()
+        })?;
+
+        let auth_str = auth_header.to_str().map_err(|_| {
+            ApiError::BadRequest("Invalid Authorization header encoding".to_string()).into_response()
+        })?;
+
+        let token = auth_str.strip_prefix("Bearer ").ok_or_else(|| {
+            ApiError::Unauthorized("Authorization header must use Bearer token".to_string()).into_response()
+        })?;
+
+        let value = state.verify(token).await.map_err(|err| err.into().into_response())?;
+        Ok(Bearer(value))
+    }
+}
+
+impl<T: OpenApiType> OpenApiExtractor for Bearer<T> {
+    fn modify_operation(op: &mut Operation) {
+        op.parameters.push(crate::openapi::Parameter {
+            name: "Authorization".to_string(),
+            in_: "header".to_string(),
+            required: true,
+            schema: crate::openapi::Schema {
+                type_: Some("string".to_string()),
+                ..Default::default()
+            },
+        });
+    }
+}
+
+impl<T: OpenApiType> OpenApiResponder for Bearer<T> {
+    fn modify_operation(_op: &mut Operation) {
+        // Auth extractor does not affect response schema.
     }
 }
 
@@ -157,6 +224,112 @@ impl<T: OpenApiType> OpenApiExtractor for Query<T> {
                 schema: prop_schema,
             });
         }
+    }
+}
+
+pub struct Page {
+    pub page: u32,
+    pub limit: u32,
+}
+
+impl std::ops::Deref for Page {
+    type Target = Self;
+
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct PageQuery {
+    page: Option<u32>,
+    limit: Option<u32>,
+}
+
+#[axum::async_trait]
+impl<S> FromRequestParts<S> for Page
+where
+    S: Send + Sync,
+{
+    type Rejection = Response;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let axum::extract::Query(value) =
+            axum::extract::Query::<PageQuery>::from_request_parts(parts, state)
+                .await
+                .map_err(|e| e.into_response())?;
+
+        let page = value.page.unwrap_or(1);
+        let limit = value.limit.unwrap_or(20);
+
+        if page == 0 {
+            return Err(ApiError::BadRequest("page must be greater than 0".to_string()).into_response());
+        }
+
+        if limit == 0 {
+            return Err(ApiError::BadRequest("limit must be greater than 0".to_string()).into_response());
+        }
+
+        Ok(Page { page, limit })
+    }
+}
+
+impl OpenApiType for Page {
+    fn schema() -> crate::openapi::Schema {
+        let mut properties = BTreeMap::new();
+        properties.insert(
+            "page".to_string(),
+            crate::openapi::Schema {
+                type_: Some("integer".to_string()),
+                ..Default::default()
+            },
+        );
+        properties.insert(
+            "limit".to_string(),
+            crate::openapi::Schema {
+                type_: Some("integer".to_string()),
+                ..Default::default()
+            },
+        );
+
+        crate::openapi::Schema {
+            type_: Some("object".to_string()),
+            properties,
+            required: vec![],
+            ..Default::default()
+        }
+    }
+}
+
+impl OpenApiExtractor for Page {
+    fn modify_operation(op: &mut Operation) {
+        op.parameters.push(crate::openapi::Parameter {
+            name: "page".to_string(),
+            in_: "query".to_string(),
+            required: false,
+            schema: crate::openapi::Schema {
+                type_: Some("integer".to_string()),
+                ..Default::default()
+            },
+        });
+        op.parameters.push(crate::openapi::Parameter {
+            name: "limit".to_string(),
+            in_: "query".to_string(),
+            required: false,
+            schema: crate::openapi::Schema {
+                type_: Some("integer".to_string()),
+                ..Default::default()
+            },
+        });
+    }
+}
+
+impl<T> OpenApiExtractor for State<T> {
+    fn modify_operation(_op: &mut Operation) {
+        // State is internal and doesn't appear in OpenAPI parameters.
     }
 }
 
