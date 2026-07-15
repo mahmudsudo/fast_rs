@@ -88,6 +88,7 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
     let mut extractor_calls = Vec::new();
     let mut path_params = Vec::new();
     let mut state_ty: Option<Type> = None;
+    let mut auth_verifier_bounds = Vec::new();
 
     for arg in &func.sig.inputs {
         if let FnArg::Typed(PatType { ty, pat, .. }) = arg {
@@ -103,6 +104,13 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
                     && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
                 {
                     state_ty = Some(inner_ty.clone());
+                } else if segment.ident == "Bearer"
+                    && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+                    && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+                {
+                    auth_verifier_bounds.push(quote! {
+                        S: fastrs::AuthVerifier<#inner_ty>
+                    });
                 }
             }
 
@@ -180,6 +188,7 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
             pub fn #orig_name<S>() -> fastrs::RouteDef<S>
             where
                 S: Clone + Send + Sync + 'static,
+                #(#auth_verifier_bounds,)*
             {
                 #func
 

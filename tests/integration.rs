@@ -308,8 +308,8 @@ async fn protected_endpoint(Bearer(user): Bearer<String>) -> Json<serde_json::Va
 #[tokio::test]
 async fn test_bearer_auth_success() {
     let app = App::new()
-        .with_state(MockAuthVerifier)
         .route(protected_endpoint)
+        .with_state(MockAuthVerifier)
         .into_router();
 
     let response = app
@@ -333,8 +333,8 @@ async fn test_bearer_auth_success() {
 #[tokio::test]
 async fn test_bearer_auth_missing_header() {
     let app = App::new()
-        .with_state(MockAuthVerifier)
         .route(protected_endpoint)
+        .with_state(MockAuthVerifier)
         .into_router();
 
     let response = app
@@ -354,8 +354,8 @@ async fn test_bearer_auth_missing_header() {
 #[tokio::test]
 async fn test_bearer_auth_invalid_token() {
     let app = App::new()
-        .with_state(MockAuthVerifier)
         .route(protected_endpoint)
+        .with_state(MockAuthVerifier)
         .into_router();
 
     let response = app
