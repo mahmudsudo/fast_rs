@@ -98,13 +98,12 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
             {
                 if segment.ident == "Path" {
                     is_path = true;
-                } else if segment.ident == "State" {
-                    if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
+                } else if segment.ident == "State"
+                    && let syn::PathArguments::AngleBracketed(args) = &segment.arguments
                         && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
                     {
                         state_ty = Some(inner_ty.clone());
                     }
-                }
             }
 
             if is_path {
