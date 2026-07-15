@@ -1,4 +1,4 @@
-use fastrs::{App, ApiError, Created, Json, NoContent, Path, Page, get, post, delete};
+use fastrs::{ApiError, App, Created, Json, NoContent, Page, Path, delete, get, post};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePool;
 
@@ -17,11 +17,10 @@ struct CreateTodoRequest {
     done: bool,
 }
 
-
 #[post("/api/sql/todos")]
 async fn create_todo(
-   axum::extract::State(pool): axum::extract::State<SqlitePool>,
-    body: Json<CreateTodoRequest>
+    axum::extract::State(pool): axum::extract::State<SqlitePool>,
+    body: Json<CreateTodoRequest>,
 ) -> Result<Created<Json<TodoResponse>>, ApiError> {
     let res = sqlx::query("INSERT INTO todos (title, done) VALUES (?, ?)")
         .bind(&body.title)
@@ -32,13 +31,11 @@ async fn create_todo(
 
     let id = res.last_insert_rowid();
 
-    let row: (i64, String, i64) = sqlx::query_as(
-        "SELECT id, title, done FROM todos WHERE id = ?",
-    )
-    .bind(id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let row: (i64, String, i64) = sqlx::query_as("SELECT id, title, done FROM todos WHERE id = ?")
+        .bind(id)
+        .fetch_one(&pool)
+        .await
+        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     Ok(Created(Json(TodoResponse {
         id: row.0,
@@ -55,25 +52,28 @@ async fn list_todos(
     let offset = ((page.page - 1) * page.limit) as i64;
     let limit = page.limit as i64;
 
-     let total_row: (i64,) = sqlx::query_as("SELECT COUNT(*) as count FROM todos")
+    let total_row: (i64,) = sqlx::query_as("SELECT COUNT(*) as count FROM todos")
         .fetch_one(&pool)
         .await
         .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let total = total_row.0;
 
-     let rows: Vec<(i64, String, i64)> = sqlx::query_as(
-        "SELECT id, title, done FROM todos ORDER BY id DESC LIMIT ? OFFSET ?",
-    )
-    .bind(limit)
-    .bind(offset)
-    .fetch_all(&pool)
-    .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let rows: Vec<(i64, String, i64)> =
+        sqlx::query_as("SELECT id, title, done FROM todos ORDER BY id DESC LIMIT ? OFFSET ?")
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(&pool)
+            .await
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     let items: Vec<TodoResponse> = rows
         .into_iter()
-        .map(|(id, title, done)| TodoResponse { id, title, done: done != 0 })
+        .map(|(id, title, done)| TodoResponse {
+            id,
+            title,
+            done: done != 0,
+        })
         .collect();
 
     Ok(Json(serde_json::json!({
@@ -89,20 +89,22 @@ async fn get_todo(
     Path(id): Path<i64>,
     axum::extract::State(pool): axum::extract::State<SqlitePool>,
 ) -> Result<Json<TodoResponse>, ApiError> {
-      let row: Option<(i64, String, i64)> = sqlx::query_as(
-        "SELECT id, title, done FROM todos WHERE id = ?",
-    )
-    .bind(id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+    let row: Option<(i64, String, i64)> =
+        sqlx::query_as("SELECT id, title, done FROM todos WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&pool)
+            .await
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 
     if let Some((row_id, title, done)) = row {
-        Ok(Json(TodoResponse { id: row_id, title, done: done != 0 }))
+        Ok(Json(TodoResponse {
+            id: row_id,
+            title,
+            done: done != 0,
+        }))
     } else {
         Err(ApiError::NotFound(format!("Todo {} not found", id)))
     }
-    
 }
 
 #[delete("/api/sql/todos/{id}")]
@@ -110,7 +112,7 @@ async fn delete_todo(
     Path(id): Path<i64>,
     axum::extract::State(pool): axum::extract::State<SqlitePool>,
 ) -> Result<NoContent, ApiError> {
-   let res = sqlx::query("DELETE FROM todos WHERE id = ?")
+    let res = sqlx::query("DELETE FROM todos WHERE id = ?")
         .bind(id)
         .execute(&pool)
         .await
@@ -127,7 +129,9 @@ async fn delete_todo(
 async fn main() {
     // Use a shared in-memory SQLite DB so connections see the same data
     let database_url = "sqlite::memory:";
-    let pool = SqlitePool::connect(&database_url).await.expect("Failed to connect to sqlite");
+    let pool = SqlitePool::connect(&database_url)
+        .await
+        .expect("Failed to connect to sqlite");
 
     // Create table
     sqlx::query(
@@ -141,14 +145,14 @@ async fn main() {
     .await
     .expect("Failed to create table");
 
-   let app = App::new()
-    .route(create_todo)
-    .route(list_todos)
-    .route(get_todo)
-    .route(delete_todo)
-    .with_state(pool.clone())
-    .serve_docs_at("/docs/sql");
-    
+    let app = App::new()
+        .route(create_todo)
+        .route(list_todos)
+        .route(get_todo)
+        .route(delete_todo)
+        .with_state(pool.clone())
+        .serve_docs_at("/docs/sql");
+
     println!("SQL Todo example running on http://0.0.0.0:8001");
     println!("OpenAPI docs at http://0.0.0.0:8001/docs/sql");
 

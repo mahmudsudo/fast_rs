@@ -1,9 +1,9 @@
 use crate::openapi::{OpenApi, Operation};
 use axum::{Router, routing::MethodRouter};
 use tower_http::{
-    cors::CorsLayer,
-    trace::{TraceLayer, DefaultOnFailure, OnFailure},
     classify::MakeClassifier,
+    cors::CorsLayer,
+    trace::{DefaultOnFailure, OnFailure, TraceLayer},
 };
 
 pub enum Method {
@@ -82,19 +82,31 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
         self
     }
 
-   pub fn with_state(self, state: S) -> App<()> {
-    App {
-        router: self.router.with_state(state),
-        openapi: self.openapi,
+    pub fn with_state(self, state: S) -> App<()> {
+        App {
+            router: self.router.with_state(state),
+            openapi: self.openapi,
+        }
     }
-}
 
     pub fn with_cors(mut self, layer: CorsLayer) -> Self {
         self.router = self.router.layer(layer);
         self
     }
 
-    pub fn with_tracing<L: std::clone::Clone+std::marker::Send+tower_http::classify::MakeClassifier+ 'static>(mut self, layer: TraceLayer<L>) -> Self where <L as MakeClassifier>::ClassifyEos: Send, DefaultOnFailure: OnFailure<<L as MakeClassifier>::FailureClass>, <L as MakeClassifier>::Classifier: Clone + Send, <L as MakeClassifier>::Classifier: 'static, <L as MakeClassifier>::ClassifyEos: 'static {
+    pub fn with_tracing<
+        L: std::clone::Clone + std::marker::Send + tower_http::classify::MakeClassifier + 'static,
+    >(
+        mut self,
+        layer: TraceLayer<L>,
+    ) -> Self
+    where
+        <L as MakeClassifier>::ClassifyEos: Send,
+        DefaultOnFailure: OnFailure<<L as MakeClassifier>::FailureClass>,
+        <L as MakeClassifier>::Classifier: Clone + Send,
+        <L as MakeClassifier>::Classifier: 'static,
+        <L as MakeClassifier>::ClassifyEos: 'static,
+    {
         self.router = self.router.layer(layer);
         self
     }

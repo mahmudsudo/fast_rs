@@ -1,10 +1,8 @@
-use fastrs::{
-    App, ApiError, Created, Json, NoContent, Page, Path, get, post, patch, delete,
-};
+use fastrs::{ApiError, App, Created, Json, NoContent, Page, Path, delete, get, patch, post};
 use serde::{Deserialize, Serialize};
-use validator::Validate;
-use std::sync::Mutex;
 use std::collections::HashMap;
+use std::sync::Mutex;
+use validator::Validate;
 
 #[derive(Debug, Clone, Serialize, Deserialize, fastrs::OpenApi)]
 struct TodoResponse {
@@ -41,7 +39,9 @@ lazy_static::lazy_static! {
 }
 
 #[post("/api/v1/todos")]
-async fn create_todo(body: Json<CreateTodoRequest>) -> Result<Created<Json<TodoResponse>>, ApiError> {
+async fn create_todo(
+    body: Json<CreateTodoRequest>,
+) -> Result<Created<Json<TodoResponse>>, ApiError> {
     let mut todos = TODOS.lock().unwrap();
     let mut next_id = NEXT_ID.lock().unwrap();
 
@@ -69,12 +69,7 @@ async fn list_todos(page: Page) -> Result<Json<TodoListResponse>, ApiError> {
     let mut sorted: Vec<_> = todos.values().cloned().collect();
     sorted.sort_by(|a, b| b.id.cmp(&a.id));
 
-    let items: Vec<TodoResponse> = sorted
-        .iter()
-        .skip(offset)
-        .take(limit)
-        .cloned()
-        .collect();
+    let items: Vec<TodoResponse> = sorted.iter().skip(offset).take(limit).cloned().collect();
 
     Ok(Json(TodoListResponse {
         items,
@@ -129,7 +124,7 @@ async fn delete_todo(Path(id): Path<i64>) -> Result<NoContent, ApiError> {
 }
 
 #[tokio::main]
- async fn main() {
+async fn main() {
     let app = App::new()
         .route(create_todo)
         .route(list_todos)

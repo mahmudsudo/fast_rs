@@ -38,5 +38,6 @@ async fn main() {
         .route(create_user)
         .route(get_user)
         .serve_docs_at("/docs")
-        .run("0.0.0.0:8000").await;
+        .run("0.0.0.0:8000")
+        .await;
 }

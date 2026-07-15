@@ -1,5 +1,5 @@
-use axum::response::{IntoResponse, Response};
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use std::collections::BTreeMap;
 
 use crate::openapi::{OpenApiResponder, Response as OpenApiResponse};
@@ -29,7 +29,11 @@ impl<T: OpenApiResponder> OpenApiResponder for Created<T> {
         T::modify_operation(&mut temp_op);
 
         for (status, response) in temp_op.responses {
-            let target_status = if status == "200" { "201".to_string() } else { status };
+            let target_status = if status == "200" {
+                "201".to_string()
+            } else {
+                status
+            };
             op.responses.insert(target_status, response);
         }
     }

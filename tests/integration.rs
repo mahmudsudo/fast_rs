@@ -3,7 +3,10 @@ use fastrs::axum::{
     body::Body,
     http::{Request, StatusCode},
 };
-use fastrs::{App, AuthVerifier, Bearer, Json, OpenApi, Query, Created, NoContent, Page, Path, get, post, delete};
+use fastrs::{
+    App, AuthVerifier, Bearer, Created, Json, NoContent, OpenApi, Page, Path, Query, delete, get,
+    post,
+};
 use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
 use validator::Validate;
@@ -234,7 +237,7 @@ async fn test_pagination_defaults() {
     assert_eq!(response.status(), StatusCode::OK);
     let bytes = body_bytes(response.into_body()).await;
     let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    
+
     assert_eq!(body["page"], 1);
     assert_eq!(body["limit"], 20);
 }
@@ -257,7 +260,7 @@ async fn test_pagination_custom() {
     assert_eq!(response.status(), StatusCode::OK);
     let bytes = body_bytes(response.into_body()).await;
     let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    
+
     assert_eq!(body["page"], 5);
     assert_eq!(body["limit"], 50);
 }

@@ -87,7 +87,7 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
     // Collect argument types and path parameters
     let mut extractor_calls = Vec::new();
     let mut path_params = Vec::new();
-    let mut state_ty: Option<Type> = None; 
+    let mut state_ty: Option<Type> = None;
 
     for arg in &func.sig.inputs {
         if let FnArg::Typed(PatType { ty, pat, .. }) = arg {
@@ -100,12 +100,11 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
                     is_path = true;
                 } else if segment.ident == "State" {
                     if let syn::PathArguments::AngleBracketed(args) = &segment.arguments
-                    && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
-                {
-                    state_ty = Some(inner_ty.clone());
+                        && let Some(syn::GenericArgument::Type(inner_ty)) = args.args.first()
+                    {
+                        state_ty = Some(inner_ty.clone());
+                    }
                 }
-                }
-               
             }
 
             if is_path {
@@ -158,49 +157,47 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
     );
 
     let expanded = if let Some(state_ty) = state_ty {
-    quote! {
-        #[allow(non_camel_case_types)]
-        pub fn #orig_name() -> fastrs::RouteDef<#state_ty> {
-            #func
+        quote! {
+            #[allow(non_camel_case_types)]
+            pub fn #orig_name() -> fastrs::RouteDef<#state_ty> {
+                #func
 
-            let mut op = fastrs::Operation::default();
-            #(#path_params)*
-            #(#extractor_calls)*
-            #(#responder_calls)*
+                let mut op = fastrs::Operation::default();
+                #(#path_params)*
+                #(#extractor_calls)*
+                #(#responder_calls)*
 
-            fastrs::RouteDef {
-                path: #path_str,
-                method: fastrs::Method::#method_enum,
-                router: fastrs::axum::routing::#method_ident(#inner_name),
-                operation: op,
+                fastrs::RouteDef {
+                    path: #path_str,
+                    method: fastrs::Method::#method_enum,
+                    router: fastrs::axum::routing::#method_ident(#inner_name),
+                    operation: op,
+                }
             }
         }
-    }
-} else {
-    quote! {
-        #[allow(non_camel_case_types)]
-        pub fn #orig_name<S>() -> fastrs::RouteDef<S>
-        where
-            S: Clone + Send + Sync + 'static,
-        {
-            #func
+    } else {
+        quote! {
+            #[allow(non_camel_case_types)]
+            pub fn #orig_name<S>() -> fastrs::RouteDef<S>
+            where
+                S: Clone + Send + Sync + 'static,
+            {
+                #func
 
-            let mut op = fastrs::Operation::default();
-            #(#path_params)*
-            #(#extractor_calls)*
-            #(#responder_calls)*
+                let mut op = fastrs::Operation::default();
+                #(#path_params)*
+                #(#extractor_calls)*
+                #(#responder_calls)*
 
-            fastrs::RouteDef {
-                path: #path_str,
-                method: fastrs::Method::#method_enum,
-                router: fastrs::axum::routing::#method_ident(#inner_name),
-                operation: op,
+                fastrs::RouteDef {
+                    path: #path_str,
+                    method: fastrs::Method::#method_enum,
+                    router: fastrs::axum::routing::#method_ident(#inner_name),
+                    operation: op,
+                }
             }
         }
-    }
-};
-
-
+    };
 
     TokenStream::from(expanded)
 }

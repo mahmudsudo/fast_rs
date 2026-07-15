@@ -1,9 +1,9 @@
 pub use axum::extract::State;
+use axum::http::header::AUTHORIZATION;
 use axum::{
     extract::{FromRequest, FromRequestParts, Request},
     response::{IntoResponse, Response},
 };
-use axum::http::header::AUTHORIZATION;
 use serde::{Serialize, de::DeserializeOwned};
 use std::collections::BTreeMap;
 use validator::Validate;
@@ -118,14 +118,19 @@ where
         })?;
 
         let auth_str = auth_header.to_str().map_err(|_| {
-            ApiError::BadRequest("Invalid Authorization header encoding".to_string()).into_response()
+            ApiError::BadRequest("Invalid Authorization header encoding".to_string())
+                .into_response()
         })?;
 
         let token = auth_str.strip_prefix("Bearer ").ok_or_else(|| {
-            ApiError::Unauthorized("Authorization header must use Bearer token".to_string()).into_response()
+            ApiError::Unauthorized("Authorization header must use Bearer token".to_string())
+                .into_response()
         })?;
 
-        let value = state.verify(token).await.map_err(|err| err.into().into_response())?;
+        let value = state
+            .verify(token)
+            .await
+            .map_err(|err| err.into().into_response())?;
         Ok(Bearer(value))
     }
 }
@@ -266,11 +271,15 @@ where
         let limit = value.limit.unwrap_or(20);
 
         if page == 0 {
-            return Err(ApiError::BadRequest("page must be greater than 0".to_string()).into_response());
+            return Err(
+                ApiError::BadRequest("page must be greater than 0".to_string()).into_response(),
+            );
         }
 
         if limit == 0 {
-            return Err(ApiError::BadRequest("limit must be greater than 0".to_string()).into_response());
+            return Err(
+                ApiError::BadRequest("limit must be greater than 0".to_string()).into_response(),
+            );
         }
 
         Ok(Page { page, limit })
