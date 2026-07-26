@@ -7,7 +7,6 @@ use fastrs::{
     App, AuthVerifier, Bearer, Created, Json, NoContent, OpenApi, Page, Path, Query, delete, get,
     post,
 };
-use tower_http::compression::CompressionLayer;
 use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
 use tower_http::compression::CompressionLayer;
@@ -378,10 +377,7 @@ async fn test_custom_layer_compression() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
-    assert_eq!(
-        response.headers().get("content-encoding").unwrap(),
-        "gzip"
-    );
+    assert_eq!(response.headers().get("content-encoding").unwrap(), "gzip");
 }
 
 #[tokio::test]
