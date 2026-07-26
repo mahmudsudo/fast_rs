@@ -4,7 +4,7 @@ use fastrs::axum::{
     body::Body,
     http::{Request, StatusCode},
 };
-use fastrs::{App, HxRefresh, HxRequest, HxTarget, HxTrigger, OpenApi, get};
+use fastrs::{App, HxRedirect, HxRefresh, HxRequest, HxTarget, HxTrigger, OpenApi, get};
 use tower::ServiceExt;
 
 #[get("/htmx")]
@@ -23,6 +23,11 @@ async fn htmx_handler(
 #[get("/htmx-refresh")]
 async fn htmx_refresh() -> HxRefresh {
     HxRefresh(true)
+}
+
+#[get("/htmx-redirect")]
+async fn htmx_redirect() -> HxRedirect {
+    HxRedirect("/todos".to_string())
 }
 
 #[tokio::test]
@@ -56,7 +61,7 @@ async fn test_htmx_extractors_in_handler() {
 
 #[tokio::test]
 async fn test_htmx_openapi_schema_reflects_headers() {
-    let app = App::new().route(htmx_handler);
+    let app: App<()> = App::new().route(htmx_handler);
     let openapi = app.openapi;
     let op = openapi
         .paths
@@ -87,4 +92,23 @@ async fn test_htmx_refresh_responder() {
 
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(response.headers().get("HX-Refresh").unwrap(), "true");
+}
+
+#[tokio::test]
+async fn test_htmx_redirect_responder() {
+    let app = App::new().route(htmx_redirect).into_router();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/htmx-redirect")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers().get("HX-Redirect").unwrap(), "/todos");
 }

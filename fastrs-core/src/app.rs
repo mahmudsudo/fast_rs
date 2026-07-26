@@ -1,9 +1,10 @@
 use crate::openapi::{OpenApi, Operation};
+use crate::rate_limit::{RateLimitConfig, RateLimitLayer};
 use axum::{
     Router,
     body::Body,
-    http::Request,
-    response::IntoResponse,
+    http::{Request, StatusCode},
+    response::{IntoResponse, Json},
     routing::{MethodRouter, Route},
 };
 use std::convert::Infallible;
@@ -11,6 +12,7 @@ use tower::{Layer, Service};
 use tower_http::{
     classify::MakeClassifier,
     cors::CorsLayer,
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     trace::{DefaultOnFailure, OnFailure, TraceLayer},
 };
 
@@ -47,6 +49,7 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
             openapi: OpenApi::new(),
         }
     }
+
     pub fn route(mut self, route_def: fn() -> RouteDef<S>) -> Self {
         let def = route_def();
 
@@ -102,6 +105,16 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
     /// This is the recommended escape hatch when fastrs does not provide a named preset for the
     /// middleware you need. All built-in middleware presets (CORS, tracing, rate limiting, etc.)
     /// are implemented on top of this method.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use tower_http::compression::CompressionLayer;
+    ///
+    /// let app = App::new()
+    ///     .route(my_handler)
+    ///     .layer(CompressionLayer::new());
+    /// ```
     pub fn layer<L>(mut self, layer: L) -> Self
     where
         L: Layer<Route> + Clone + Send + 'static,
@@ -134,6 +147,113 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
         <L as MakeClassifier>::ClassifyEos: 'static,
     {
         self.layer(layer)
+    }
+
+    /// Attach rate limiting middleware via `.layer()`.
+    ///
+    /// Returns `429 Too Many Requests` when the threshold is exceeded.
+    /// Uses `rate_rs` with an in-memory sliding-window store.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use std::time::Duration;
+    /// use fastrs::{App, RateLimitConfig};
+    ///
+    /// let app = App::new()
+    ///     .route(my_handler)
+    ///     .with_rate_limit(RateLimitConfig::new(100, Duration::from_secs(60)));
+    /// ```
+    pub fn with_rate_limit(self, config: RateLimitConfig) -> Self {
+        self.layer(RateLimitLayer::new(config))
+    }
+
+    /// Attach request-ID middleware via `.layer()`.
+    ///
+    /// Generates a UUID v4 `X-Request-Id` header if the request doesn't already
+    /// carry one, and propagates it through to the response. When combined with
+    /// `.with_tracing()`, the request ID is automatically included in tracing spans.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let app = App::new()
+    ///     .route(my_handler)
+    ///     .with_request_id();
+    /// ```
+    pub fn with_request_id(self) -> Self {
+        self.layer(PropagateRequestIdLayer::x_request_id())
+            .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
+    }
+
+    /// Register a health-check endpoint at `path`.
+    ///
+    /// Returns `200 OK` with `{"status":"ok","version":"<crate version>"}`.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let app = App::new()
+    ///     .route(my_handler)
+    ///     .health_check("/health");
+    /// ```
+    pub fn health_check(mut self, path: &'static str) -> Self {
+        self.router = self.router.route(
+            path,
+            axum::routing::get(|| async {
+                Json(serde_json::json!({
+                    "status": "ok",
+                    "version": env!("CARGO_PKG_VERSION"),
+                }))
+            }),
+        );
+        self
+    }
+
+    /// Register a health-check endpoint with a custom async check function.
+    ///
+    /// The `check_fn` is called on every request. If it returns `Ok(())`,
+    /// the response is `200 OK`. If it returns `Err(msg)`, the response is
+    /// `503 Service Unavailable` with the error message in the body.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let app = App::new()
+    ///     .route(my_handler)
+    ///     .health_check_with("/health", || async {
+    ///         db_ping().await.map_err(|e| e.to_string())
+    ///     });
+    /// ```
+    pub fn health_check_with<F, Fut>(mut self, path: &'static str, check_fn: F) -> Self
+    where
+        F: Fn() -> Fut + Clone + Send + Sync + 'static,
+        Fut: std::future::Future<Output = Result<(), String>> + Send,
+    {
+        self.router = self.router.route(
+            path,
+            axum::routing::get(move || {
+                let check = check_fn.clone();
+                async move {
+                    match check().await {
+                        Ok(()) => (
+                            StatusCode::OK,
+                            Json(serde_json::json!({
+                                "status": "ok",
+                                "version": env!("CARGO_PKG_VERSION"),
+                            })),
+                        )
+                            .into_response(),
+                        Err(msg) => (
+                            StatusCode::SERVICE_UNAVAILABLE,
+                            Json(serde_json::json!({ "status": "error", "message": msg })),
+                        )
+                            .into_response(),
+                    }
+                }
+            }),
+        );
+        self
     }
 
     pub fn serve_docs_at(mut self, path: &'static str) -> Self {
@@ -190,8 +310,46 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
 }
 
 impl App<()> {
+    /// Start the HTTP server, listening for SIGINT / SIGTERM for graceful shutdown.
+    ///
+    /// All in-flight requests are allowed to complete before the process exits.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// App::new().route(my_handler).run("0.0.0.0:8000").await;
+    /// ```
     pub async fn run(self, addr: &str) {
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-        axum::serve(listener, self.router).await.unwrap();
+        axum::serve(listener, self.router)
+            .with_graceful_shutdown(shutdown_signal())
+            .await
+            .unwrap();
+    }
+}
+
+async fn shutdown_signal() {
+    use tokio::signal;
+
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install SIGTERM handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
     }
 }

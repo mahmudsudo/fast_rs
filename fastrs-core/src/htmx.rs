@@ -2,7 +2,13 @@
 //!
 //! Re-exports axum-htmx extractors/responders and adds OpenAPI header documentation.
 
-pub use axum_htmx::{HxRedirect, HxRefresh, HxRequest, HxTarget, HxTrigger};
+pub use axum_htmx::{HxRequest, HxTarget, HxTrigger};
+
+use axum::{
+    body::Body,
+    http::HeaderValue,
+    response::{IntoResponse, Response},
+};
 
 use crate::openapi::{OpenApiExtractor, Operation, Schema};
 
@@ -48,6 +54,19 @@ impl OpenApiExtractor for HxTrigger {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct HxRedirect(pub String);
+
+impl IntoResponse for HxRedirect {
+    fn into_response(self) -> Response {
+        let mut response = Response::new(Body::empty());
+        if let Ok(value) = HeaderValue::from_str(&self.0) {
+            response.headers_mut().insert("HX-Redirect", value);
+        }
+        response
+    }
+}
+
 impl crate::openapi::OpenApiResponder for HxRedirect {
     fn modify_operation(op: &mut Operation) {
         op.responses.insert(
@@ -57,6 +76,20 @@ impl crate::openapi::OpenApiResponder for HxRedirect {
                 content: Default::default(),
             },
         );
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct HxRefresh(pub bool);
+
+impl IntoResponse for HxRefresh {
+    fn into_response(self) -> Response {
+        let mut response = Response::new(Body::empty());
+        let value = if self.0 { "true" } else { "false" };
+        response
+            .headers_mut()
+            .insert("HX-Refresh", HeaderValue::from_static(value));
+        response
     }
 }
 

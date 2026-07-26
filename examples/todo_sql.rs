@@ -129,7 +129,10 @@ async fn get_todo(
             done: done != 0,
         }))
     } else {
-        Err(AppError(ApiError::NotFound(format!("Todo {} not found", id))))
+        Err(AppError(ApiError::NotFound(format!(
+            "Todo {} not found",
+            id
+        ))))
     }
 }
 
@@ -144,7 +147,10 @@ async fn delete_todo(
         .await?;
 
     if res.rows_affected() == 0 {
-        return Err(AppError(ApiError::NotFound(format!("Todo {} not found", id))));
+        return Err(AppError(ApiError::NotFound(format!(
+            "Todo {} not found",
+            id
+        ))));
     }
 
     Ok(NoContent)

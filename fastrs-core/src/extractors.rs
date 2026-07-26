@@ -397,3 +397,84 @@ impl<T: HeaderName, V: OpenApiType> OpenApiExtractor for Header<T, V> {
         });
     }
 }
+
+/// A `multipart/form-data` extractor backed by [`axum::extract::Multipart`].
+///
+/// Use this extractor to receive file uploads and mixed multipart payloads.
+/// Fields are accessed by iterating over the stream with `.next_field().await`.
+///
+/// # OpenAPI schema limitations
+///
+/// `multipart/form-data` payloads are inherently dynamic and schema generation
+/// is limited. The generated OpenAPI spec will record the request body as
+/// `multipart/form-data` with an opaque binary schema. For accurate field-level
+/// documentation, annotate your handler with `#[doc]` comments or extend the
+/// generated spec manually.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::{post, Multipart};
+///
+/// #[post("/upload")]
+/// async fn upload(mut multipart: Multipart) -> String {
+///     while let Some(field) = multipart.next_field().await.unwrap() {
+///         let name = field.name().unwrap_or("unknown").to_string();
+///         let data = field.bytes().await.unwrap();
+///         println!("Field `{}`: {} bytes", name, data.len());
+///     }
+///     "uploaded".to_string()
+/// }
+/// ```
+pub struct Multipart(pub axum::extract::Multipart);
+
+impl std::ops::Deref for Multipart {
+    type Target = axum::extract::Multipart;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for Multipart {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+#[axum::async_trait]
+impl<S> FromRequest<S> for Multipart
+where
+    S: Send + Sync,
+{
+    type Rejection = Response;
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        axum::extract::Multipart::from_request(req, state)
+            .await
+            .map(Multipart)
+            .map_err(|e| {
+                crate::error::ApiError::BadRequest(format!("multipart error: {}", e))
+                    .into_response()
+            })
+    }
+}
+
+impl OpenApiExtractor for Multipart {
+    fn modify_operation(op: &mut Operation) {
+        let mut content = BTreeMap::new();
+        content.insert(
+            "multipart/form-data".to_string(),
+            MediaType {
+                schema: crate::openapi::Schema {
+                    type_: Some("string".to_string()),
+                    format: Some("binary".to_string()),
+                    ..Default::default()
+                },
+            },
+        );
+        op.request_body = Some(RequestBody {
+            content,
+            required: true,
+        });
+    }
+}

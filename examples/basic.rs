@@ -31,11 +31,16 @@ async fn get_user(Path(id): Path<u64>) -> Json<UserResponse> {
         email: "x@y.com".into(),
     })
 }
+#[get("/")]
+async fn get() -> Json<String> {
+    Json(String::from("hello world"))
+}
 
 #[tokio::main]
 async fn main() {
     fastrs::App::new()
         .route(create_user)
+        .route(get)
         .route(get_user)
         .serve_docs_at("/docs")
         .run("0.0.0.0:8000")

@@ -1,3 +1,4 @@
+use axum::response::Response as AxumResponse;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
@@ -96,6 +97,10 @@ pub trait OpenApiExtractor {
 
 pub trait OpenApiResponder {
     fn modify_operation(op: &mut Operation);
+}
+
+impl OpenApiResponder for AxumResponse {
+    fn modify_operation(_op: &mut Operation) {}
 }
 
 impl OpenApiType for u64 {

@@ -37,6 +37,11 @@ name = "htmx_integration"
 path = "tests/htmx_integration.rs"
 required-features = ["htmx"]
 
+[[test]]
+name = "production"
+path = "tests/production.rs"
+
+
 [dev-dependencies]
 serde_json = "1.0"
 tower = { version = "0.4", features = ["util"] }

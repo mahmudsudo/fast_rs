@@ -1,15 +1,15 @@
-use fastrs::axum::response::{Html, IntoResponse, Response};
+use fastrs::axum::response::{Html, IntoResponse};
 use fastrs::{App, HxRequest, get};
 
 #[get("/todos")]
 async fn todos_page(HxRequest(is_htmx): HxRequest) -> impl IntoResponse {
-    let fragment = r#"<ul id="todo-list"><li>Buy milk</li><li>Walk the dog</li></ul>"#;
+    let fragment = r##"<ul id="todo-list"><li>Buy milk</li><li>Walk the dog</li></ul>"##;
 
     if is_htmx {
         Html(fragment.to_string()).into_response()
     } else {
         let page = format!(
-            r#"<!DOCTYPE html>
+            r##"<!DOCTYPE html>
 <html>
 <head>
     <title>HTMX Todo</title>
@@ -17,18 +17,18 @@ async fn todos_page(HxRequest(is_htmx): HxRequest) -> impl IntoResponse {
 </head>
 <body>
     <h1>Todos</h1>
-    <button hx-get="/todos" hx-target="#todo-list " hx-swap="outerHTML">Refresh</button>
+    <button hx-get="/todos" hx-target="#todo-list" hx-swap="outerHTML">Refresh</button>
     {fragment}
 </body>
-</html>"#
+</html>"##
         );
         Html(page).into_response()
     }
 }
 
 #[get("/redirect-demo")]
-async fn redirect_demo() -> Response {
-    fastrs::HxRedirect("/todos".to_string()).into_response()
+async fn redirect_demo() -> fastrs::HxRedirect {
+    fastrs::HxRedirect("/todos".to_string())
 }
 
 #[tokio::main]

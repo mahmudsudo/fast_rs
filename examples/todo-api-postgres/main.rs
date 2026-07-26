@@ -129,11 +129,12 @@ async fn update_todo(
     axum::extract::State(pool): axum::extract::State<PgPool>,
     body: Json<UpdateTodoRequest>,
 ) -> Result<Json<TodoResponse>, AppError> {
-    let existing = sqlx::query_as::<_, TodoResponse>("SELECT id, title, done FROM todos WHERE id = $1")
-        .bind(id)
-        .fetch_optional(&pool)
-        .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Todo {} not found", id)))?;
+    let existing =
+        sqlx::query_as::<_, TodoResponse>("SELECT id, title, done FROM todos WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&pool)
+            .await?
+            .ok_or_else(|| ApiError::NotFound(format!("Todo {} not found", id)))?;
 
     let new_title = body.title.clone().unwrap_or(existing.title);
     let new_done = body.done.unwrap_or(existing.done);
@@ -161,7 +162,10 @@ async fn delete_todo(
         .await?;
 
     if res.rows_affected() == 0 {
-        return Err(AppError(ApiError::NotFound(format!("Todo {} not found", id))));
+        return Err(AppError(ApiError::NotFound(format!(
+            "Todo {} not found",
+            id
+        ))));
     }
 
     Ok(NoContent)
@@ -172,9 +176,9 @@ async fn main() {
     let db_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/fastrs_todo".to_string());
 
-    let pool = PgPool::connect(&db_url)
-        .await
-        .expect("Failed to connect to Postgres. Make sure DATABASE_URL is set and Postgres is running.");
+    let pool = PgPool::connect(&db_url).await.expect(
+        "Failed to connect to Postgres. Make sure DATABASE_URL is set and Postgres is running.",
+    );
 
     let app = App::new()
         .route(create_todo)

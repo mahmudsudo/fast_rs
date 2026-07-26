@@ -144,7 +144,9 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
     }
 
     let mut responder_calls = Vec::new();
-    if let ReturnType::Type(_, ty) = &func.sig.output {
+    if let ReturnType::Type(_, ty) = &func.sig.output
+        && !matches!(ty.as_ref(), Type::ImplTrait(_))
+    {
         responder_calls.push(quote! {
             <#ty as fastrs::OpenApiResponder>::modify_operation(&mut op);
         });
