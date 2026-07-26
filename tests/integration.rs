@@ -10,6 +10,7 @@ use fastrs::{
 use tower_http::compression::CompressionLayer;
 use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
+use tower_http::compression::CompressionLayer;
 use validator::Validate;
 
 #[derive(Deserialize, Validate, OpenApi)]
