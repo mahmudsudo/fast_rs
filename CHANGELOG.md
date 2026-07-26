@@ -8,17 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **Auth Extractor**: `Bearer<T>` extractor for OAuth/JWT tokens with pluggable `AuthVerifier` trait. Automatically validates tokens and returns 401 on failure.
-- **Pagination Extractor**: `Page` query extractor with sensible defaults (page=1, limit=20), bounds validation, and OpenAPI schema generation.
-- **Response Status Codes**: `Created<T>` wrapper (201) and `NoContent` (204) response types with proper OpenAPI code generation.
-- **Middleware Presets**: `.with_cors()` and `.with_tracing()` builder methods wrapping tower-http layers for common use cases.
-- **HTTP Method**: Added support for PATCH requests via `#[patch]` macro.
-- **Type Support**: Added `OpenApiType` implementations for `i64` and `serde_json::Value` for richer schema generation.
-- **Full-featured Example**: New `examples/todo_api.rs` demonstrating all framework features: CRUD, pagination, validation, auth, and custom response codes.
-- **Integration Tests**: Extended test suite covering new features (response codes, pagination bounds, bearer auth flow).
-
-### Fixed
-- State extractor now implements `OpenApiExtractor` with no-op to prevent breaking OpenAPI generation when used in handlers.
+- `App::layer<L>()` generic tower middleware escape hatch; `with_cors()` and `with_tracing()` refactored to use it internally (Part A)
+- htmx integration via `axum-htmx` behind the `htmx` feature flag; `OpenApiExtractor` wrappers for `HxRequest`, `HxTarget`, `HxTrigger`, `HxRedirect`, `HxRefresh`; `examples/htmx-todo/` (Part B)
+- `examples/todo-api-postgres/` — full CRUD Todo API backed by Postgres via sqlx; DB error → ApiError pattern documented (Part C)
+- `with_rate_limit(RateLimitConfig)` — rate limiting via `rate_rs`, returns 429 on breach (Part D)
+- `health_check(path)` and `health_check_with(path, check_fn)` — simple and custom health check endpoints, 503 on check failure (Part D)
+- `with_request_id()` — UUID v4 `X-Request-Id` header, integrated with tracing spans (Part D)
+- `Multipart` extractor for `multipart/form-data` (Part D)
+- Graceful shutdown on SIGINT/SIGTERM in `.run()` (Part D)
 
 ## [0.1.0] - Previous Release
 
