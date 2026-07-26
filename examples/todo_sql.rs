@@ -17,25 +17,54 @@ struct CreateTodoRequest {
     done: bool,
 }
 
+/// Custom error wrapper pattern for database error mapping.
+#[derive(Debug)]
+pub struct AppError(pub ApiError);
+
+impl From<sqlx::Error> for AppError {
+    fn from(err: sqlx::Error) -> Self {
+        match err {
+            sqlx::Error::RowNotFound => AppError(ApiError::NotFound("Todo not found".to_string())),
+            _ => AppError(ApiError::InternalServerError(err.to_string())),
+        }
+    }
+}
+
+impl From<ApiError> for AppError {
+    fn from(err: ApiError) -> Self {
+        AppError(err)
+    }
+}
+
+impl axum::response::IntoResponse for AppError {
+    fn into_response(self) -> axum::response::Response {
+        self.0.into_response()
+    }
+}
+
+impl fastrs::OpenApiResponder for AppError {
+    fn modify_operation(op: &mut fastrs::Operation) {
+        ApiError::modify_operation(op);
+    }
+}
+
 #[post("/api/sql/todos")]
 async fn create_todo(
     axum::extract::State(pool): axum::extract::State<SqlitePool>,
     body: Json<CreateTodoRequest>,
-) -> Result<Created<Json<TodoResponse>>, ApiError> {
+) -> Result<Created<Json<TodoResponse>>, AppError> {
     let res = sqlx::query("INSERT INTO todos (title, done) VALUES (?, ?)")
         .bind(&body.title)
         .bind(body.done)
         .execute(&pool)
-        .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        .await?;
 
     let id = res.last_insert_rowid();
 
     let row: (i64, String, i64) = sqlx::query_as("SELECT id, title, done FROM todos WHERE id = ?")
         .bind(id)
         .fetch_one(&pool)
-        .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        .await?;
 
     Ok(Created(Json(TodoResponse {
         id: row.0,
@@ -48,14 +77,13 @@ async fn create_todo(
 async fn list_todos(
     page: Page,
     axum::extract::State(pool): axum::extract::State<SqlitePool>,
-) -> Result<Json<serde_json::Value>, ApiError> {
+) -> Result<Json<serde_json::Value>, AppError> {
     let offset = ((page.page - 1) * page.limit) as i64;
     let limit = page.limit as i64;
 
     let total_row: (i64,) = sqlx::query_as("SELECT COUNT(*) as count FROM todos")
         .fetch_one(&pool)
-        .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        .await?;
 
     let total = total_row.0;
 
@@ -64,8 +92,7 @@ async fn list_todos(
             .bind(limit)
             .bind(offset)
             .fetch_all(&pool)
-            .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            .await?;
 
     let items: Vec<TodoResponse> = rows
         .into_iter()
@@ -88,13 +115,12 @@ async fn list_todos(
 async fn get_todo(
     Path(id): Path<i64>,
     axum::extract::State(pool): axum::extract::State<SqlitePool>,
-) -> Result<Json<TodoResponse>, ApiError> {
+) -> Result<Json<TodoResponse>, AppError> {
     let row: Option<(i64, String, i64)> =
         sqlx::query_as("SELECT id, title, done FROM todos WHERE id = ?")
             .bind(id)
             .fetch_optional(&pool)
-            .await
-            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+            .await?;
 
     if let Some((row_id, title, done)) = row {
         Ok(Json(TodoResponse {
@@ -103,7 +129,7 @@ async fn get_todo(
             done: done != 0,
         }))
     } else {
-        Err(ApiError::NotFound(format!("Todo {} not found", id)))
+        Err(AppError(ApiError::NotFound(format!("Todo {} not found", id))))
     }
 }
 
@@ -111,15 +137,14 @@ async fn get_todo(
 async fn delete_todo(
     Path(id): Path<i64>,
     axum::extract::State(pool): axum::extract::State<SqlitePool>,
-) -> Result<NoContent, ApiError> {
+) -> Result<NoContent, AppError> {
     let res = sqlx::query("DELETE FROM todos WHERE id = ?")
         .bind(id)
         .execute(&pool)
-        .await
-        .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+        .await?;
 
     if res.rows_affected() == 0 {
-        return Err(ApiError::NotFound(format!("Todo {} not found", id)));
+        return Err(AppError(ApiError::NotFound(format!("Todo {} not found", id))));
     }
 
     Ok(NoContent)
