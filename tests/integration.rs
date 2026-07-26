@@ -7,6 +7,7 @@ use fastrs::{
     App, AuthVerifier, Bearer, Created, Json, NoContent, OpenApi, Page, Path, Query, delete, get,
     post,
 };
+use tower_http::compression::CompressionLayer;
 use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
 use validator::Validate;
@@ -349,6 +350,37 @@ async fn test_bearer_auth_missing_header() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[get("/compressed")]
+async fn compressed_endpoint() -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "data": "hello world hello world hello world" }))
+}
+
+#[tokio::test]
+async fn test_custom_layer_compression() {
+    let app = App::new()
+        .route(compressed_endpoint)
+        .layer(CompressionLayer::new())
+        .into_router();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/compressed")
+                .header("accept-encoding", "gzip")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers().get("content-encoding").unwrap(),
+        "gzip"
+    );
 }
 
 #[tokio::test]
