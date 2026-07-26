@@ -1,5 +1,13 @@
 use crate::openapi::{OpenApi, Operation};
-use axum::{Router, routing::MethodRouter};
+use axum::{
+    Router,
+    body::Body,
+    http::Request,
+    response::IntoResponse,
+    routing::{MethodRouter, Route},
+};
+use std::convert::Infallible;
+use tower::{Layer, Service};
 use tower_http::{
     classify::MakeClassifier,
     cors::CorsLayer,
@@ -89,15 +97,33 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
         }
     }
 
-    pub fn with_cors(mut self, layer: CorsLayer) -> Self {
+    /// Attach any `tower` / `tower-http` middleware layer directly to the underlying router.
+    ///
+    /// This is the recommended escape hatch when fastrs does not provide a named preset for the
+    /// middleware you need. All built-in middleware presets (CORS, tracing, rate limiting, etc.)
+    /// are implemented on top of this method.
+    pub fn layer<L>(mut self, layer: L) -> Self
+    where
+        L: Layer<Route> + Clone + Send + 'static,
+        L::Service: Service<Request<Body>> + Clone + Send + 'static,
+        <L::Service as Service<Request<Body>>>::Response: IntoResponse + 'static,
+        <L::Service as Service<Request<Body>>>::Error: Into<Infallible> + 'static,
+        <L::Service as Service<Request<Body>>>::Future: Send + 'static,
+    {
         self.router = self.router.layer(layer);
         self
     }
 
+    /// Convenience wrapper around [`.layer()`](Self::layer) for `tower_http::CorsLayer`.
+    pub fn with_cors(self, layer: CorsLayer) -> Self {
+        self.layer(layer)
+    }
+
+    /// Convenience wrapper around [`.layer()`](Self::layer) for `tower_http::TraceLayer`.
     pub fn with_tracing<
         L: std::clone::Clone + std::marker::Send + tower_http::classify::MakeClassifier + 'static,
     >(
-        mut self,
+        self,
         layer: TraceLayer<L>,
     ) -> Self
     where
@@ -107,8 +133,7 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
         <L as MakeClassifier>::Classifier: 'static,
         <L as MakeClassifier>::ClassifyEos: 'static,
     {
-        self.router = self.router.layer(layer);
-        self
+        self.layer(layer)
     }
 
     pub fn serve_docs_at(mut self, path: &'static str) -> Self {
