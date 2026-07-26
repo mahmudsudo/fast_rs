@@ -157,7 +157,6 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
             router: self.router.with_state(state),
             openapi: self.openapi,
         }
-
     }
 
     /// Attach any `tower` / `tower-http` middleware layer directly to the underlying router.

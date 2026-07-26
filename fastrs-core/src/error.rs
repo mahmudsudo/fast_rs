@@ -88,7 +88,6 @@ pub trait IntoApiError {
     fn into_api_error(self) -> ApiError;
 }
 
-
 impl<T: IntoApiError> From<T> for ApiError {
     fn from(err: T) -> Self {
         err.into_api_error()

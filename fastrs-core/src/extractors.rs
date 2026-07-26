@@ -143,7 +143,6 @@ pub trait AuthVerifier<T>: Send + Sync + 'static {
 /// ```
 pub struct Bearer<T>(pub T);
 
-
 impl<T> std::ops::Deref for Bearer<T> {
     type Target = T;
 
@@ -328,7 +327,6 @@ pub struct Page {
     pub limit: u32,
 }
 
-
 impl std::ops::Deref for Page {
     type Target = Self;
 
@@ -467,7 +465,6 @@ pub trait HeaderName: Send + Sync {
 /// }
 /// ```
 pub struct Header<T: HeaderName, V = String>(pub V, std::marker::PhantomData<T>);
-
 
 impl<T: HeaderName, V> std::ops::Deref for Header<T, V> {
     type Target = V;

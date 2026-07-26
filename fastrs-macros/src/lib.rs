@@ -24,7 +24,6 @@ pub fn derive_openapi(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = input.ident;
 
-
     let mut properties = Vec::new();
     let mut required = Vec::new();
 
@@ -312,4 +311,3 @@ pub fn patch(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn delete(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_route("delete", attr, item)
 }
-

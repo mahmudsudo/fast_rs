@@ -63,7 +63,6 @@ impl<T: OpenApiResponder> OpenApiResponder for Created<T> {
 /// ```
 pub struct NoContent;
 
-
 impl IntoResponse for NoContent {
     fn into_response(self) -> Response {
         (StatusCode::NO_CONTENT, "").into_response()

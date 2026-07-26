@@ -53,7 +53,6 @@ impl RateLimitConfig {
 /// ```
 #[derive(Clone)]
 pub struct RateLimitLayer {
-
     config: RateLimitConfig,
     limiter: Arc<RateLimiter<InMemoryStore>>,
 }

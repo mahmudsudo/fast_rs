@@ -104,7 +104,6 @@ impl crate::openapi::OpenApiResponder for HxRedirect {
 #[derive(Debug, Clone, Copy)]
 pub struct HxRefresh(pub bool);
 
-
 impl IntoResponse for HxRefresh {
     fn into_response(self) -> Response {
         let mut response = Response::new(Body::empty());
