@@ -1,0 +1,9 @@
+[book]
+title = "fastrs"
+authors = ["Mahmud Bello"]
+language = "en"
+src = "docs/src"
+
+[output.html]
+git-repository-url = "https://github.com/mahmudsudo/fast_rs"
+edit-url-template = "https://github.com/mahmudsudo/fast_rs/edit/main/{path}"
