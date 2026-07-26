@@ -4,6 +4,17 @@ use std::collections::BTreeMap;
 
 use crate::openapi::{OpenApiResponder, Response as OpenApiResponse};
 
+/// Response wrapper to set status code to 201 Created and modify the OpenAPI schema accordingly.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::{Created, Json};
+///
+/// async fn handler() -> Created<Json<String>> {
+///     Created(Json("created".to_string()))
+/// }
+/// ```
 pub struct Created<T>(pub T);
 
 impl<T> std::ops::Deref for Created<T> {
@@ -39,7 +50,19 @@ impl<T: OpenApiResponder> OpenApiResponder for Created<T> {
     }
 }
 
+/// Response type representing an empty body with a 204 No Content status code.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::NoContent;
+///
+/// async fn handler() -> NoContent {
+///     NoContent
+/// }
+/// ```
 pub struct NoContent;
+
 
 impl IntoResponse for NoContent {
     fn into_response(self) -> Response {

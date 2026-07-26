@@ -54,6 +54,17 @@ impl OpenApiExtractor for HxTrigger {
     }
 }
 
+/// Responder for returning an HTMX redirect response (`HX-Redirect` header).
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::HxRedirect;
+///
+/// async fn handler() -> HxRedirect {
+///     HxRedirect("/target-page".to_string())
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct HxRedirect(pub String);
 
@@ -79,8 +90,20 @@ impl crate::openapi::OpenApiResponder for HxRedirect {
     }
 }
 
+/// Responder for triggering a client-side page refresh via HTMX (`HX-Refresh` header).
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::HxRefresh;
+///
+/// async fn handler() -> HxRefresh {
+///     HxRefresh(true)
+/// }
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct HxRefresh(pub bool);
+
 
 impl IntoResponse for HxRefresh {
     fn into_response(self) -> Response {

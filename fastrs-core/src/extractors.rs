@@ -13,6 +13,27 @@ use crate::openapi::{
     MediaType, OpenApiExtractor, OpenApiResponder, OpenApiType, Operation, RequestBody,
 };
 
+/// Extractor for deserializing and validating JSON request bodies.
+///
+/// Automatically runs validations if `T` implements `validator::Validate`.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::Json;
+/// use serde::Deserialize;
+/// use validator::Validate;
+///
+/// #[derive(Deserialize, Validate)]
+/// struct User {
+///     #[validate(email)]
+///     email: String,
+/// }
+///
+/// async fn handler(Json(user): Json<User>) {
+///     println!("{}", user.email);
+/// }
+/// ```
 pub struct Json<T>(pub T);
 
 impl<T> std::ops::Deref for Json<T> {
@@ -28,7 +49,6 @@ impl<T: Serialize> IntoResponse for Json<T> {
         axum::Json(self.0).into_response()
     }
 }
-
 #[axum::async_trait]
 impl<T, S> FromRequest<S> for Json<T>
 where
@@ -84,6 +104,25 @@ impl<T: OpenApiType> OpenApiResponder for Json<T> {
         );
     }
 }
+/// Trait implemented by application state to verify Bearer auth tokens.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::{AuthVerifier, ApiError};
+/// use axum::async_trait;
+///
+/// #[derive(Clone)]
+/// struct AppState;
+///
+/// #[async_trait]
+/// impl AuthVerifier<String> for AppState {
+///     type Error = ApiError;
+///     async fn verify(&self, token: &str) -> Result<String, Self::Error> {
+///         if token == "secret" { Ok("user".to_string()) } else { Err(ApiError::Unauthorized("Invalid".to_string())) }
+///     }
+/// }
+/// ```
 #[axum::async_trait]
 pub trait AuthVerifier<T>: Send + Sync + 'static {
     type Error: Into<ApiError>;
@@ -91,7 +130,19 @@ pub trait AuthVerifier<T>: Send + Sync + 'static {
     async fn verify(&self, token: &str) -> Result<T, Self::Error>;
 }
 
+/// Extractor for parsing Bearer tokens and authenticating via the application state.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::Bearer;
+///
+/// async fn secure_handler(Bearer(user): Bearer<String>) {
+///     println!("Authenticated user: {}", user);
+/// }
+/// ```
 pub struct Bearer<T>(pub T);
+
 
 impl<T> std::ops::Deref for Bearer<T> {
     type Target = T;
@@ -155,6 +206,17 @@ impl<T: OpenApiType> OpenApiResponder for Bearer<T> {
     }
 }
 
+/// Extractor for parsing URL path parameters.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::Path;
+///
+/// async fn handler(Path(id): Path<u32>) {
+///     println!("User ID: {}", id);
+/// }
+/// ```
 pub struct Path<T>(pub T);
 
 impl<T> std::ops::Deref for Path<T> {
@@ -183,6 +245,24 @@ where
     }
 }
 
+/// Extractor for parsing and validating query parameters from the URL.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::Query;
+/// use serde::Deserialize;
+/// use validator::Validate;
+///
+/// #[derive(Deserialize, Validate)]
+/// struct Params {
+///     search: Option<String>,
+/// }
+///
+/// async fn handler(Query(params): Query<Params>) {
+///     println!("{:?}", params.search);
+/// }
+/// ```
 pub struct Query<T>(pub T);
 
 impl<T> std::ops::Deref for Query<T> {
@@ -232,10 +312,22 @@ impl<T: OpenApiType> OpenApiExtractor for Query<T> {
     }
 }
 
+/// Extractor for handling paginated requests with default/minimum limits.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::Page;
+///
+/// async fn handler(page: Page) {
+///     println!("page: {}, limit: {}", page.page, page.limit);
+/// }
+/// ```
 pub struct Page {
     pub page: u32,
     pub limit: u32,
 }
+
 
 impl std::ops::Deref for Page {
     type Target = Self;
@@ -342,11 +434,40 @@ impl<T> OpenApiExtractor for State<T> {
     }
 }
 
+/// Trait specifying a static header name for type-safe header extraction.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::HeaderName;
+///
+/// struct XApiKey;
+/// impl HeaderName for XApiKey {
+///     fn name() -> &'static str { "x-api-key" }
+/// }
+/// ```
 pub trait HeaderName: Send + Sync {
     fn name() -> &'static str;
 }
 
+/// Extractor for retrieving and parsing type-safe request headers.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::{Header, HeaderName};
+///
+/// struct XUser;
+/// impl HeaderName for XUser {
+///     fn name() -> &'static str { "x-user" }
+/// }
+///
+/// async fn handler(Header(user, _): Header<XUser, String>) {
+///     println!("Request from: {}", user);
+/// }
+/// ```
 pub struct Header<T: HeaderName, V = String>(pub V, std::marker::PhantomData<T>);
+
 
 impl<T: HeaderName, V> std::ops::Deref for Header<T, V> {
     type Target = V;

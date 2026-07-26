@@ -4,10 +4,26 @@ use syn::{
     DeriveInput, FnArg, ItemFn, LitStr, Pat, PatIdent, PatType, ReturnType, Type, parse_macro_input,
 };
 
+/// Derive macro for generating OpenAPI schemas for structs at compile time.
+///
+/// Under the hood, this generates implementations of the `OpenApiType` trait.
+/// It also reads nested `#[validate(...)]` attributes to document validation bounds in the schema.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::OpenApi;
+///
+/// #[derive(OpenApi)]
+/// struct User {
+///     name: String,
+/// }
+/// ```
 #[proc_macro_derive(OpenApi, attributes(validate))]
 pub fn derive_openapi(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = input.ident;
+
 
     let mut properties = Vec::new();
     let mut required = Vec::new();
@@ -212,27 +228,88 @@ fn generate_route(method: &str, attr: TokenStream, item: TokenStream) -> TokenSt
     TokenStream::from(expanded)
 }
 
+/// Attribute macro to define a GET route handler.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::get;
+///
+/// #[get("/items/{id}")]
+/// async fn get_item(id: String) -> &'static str {
+///     "item details"
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn get(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_route("get", attr, item)
 }
 
+/// Attribute macro to define a POST route handler.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::{post, Json};
+///
+/// #[post("/items")]
+/// async fn create_item(Json(body): Json<String>) -> &'static str {
+///     "created"
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn post(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_route("post", attr, item)
 }
 
+/// Attribute macro to define a PUT route handler.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::{put, Json};
+///
+/// #[put("/items/{id}")]
+/// async fn update_item(id: String, Json(body): Json<String>) -> &'static str {
+///     "updated"
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn put(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_route("put", attr, item)
 }
 
+/// Attribute macro to define a PATCH route handler.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::{patch, Json};
+///
+/// #[patch("/items/{id}")]
+/// async fn patch_item(id: String, Json(body): Json<String>) -> &'static str {
+///     "patched"
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn patch(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_route("patch", attr, item)
 }
 
+/// Attribute macro to define a DELETE route handler.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::delete;
+///
+/// #[delete("/items/{id}")]
+/// async fn delete_item(id: String) -> &'static str {
+///     "deleted"
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn delete(attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_route("delete", attr, item)
 }
+

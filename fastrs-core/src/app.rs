@@ -24,6 +24,14 @@ pub enum Method {
     Delete,
 }
 
+/// Defines a route with its path, HTTP method, Axum handler, and OpenAPI operation details.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::RouteDef;
+/// // RouteDef is typically constructed using the route macros like #[get("/")]
+/// ```
 pub struct RouteDef<S = ()> {
     pub path: &'static str,
     pub method: Method,
@@ -31,6 +39,15 @@ pub struct RouteDef<S = ()> {
     pub operation: Operation,
 }
 
+/// The main application builder for configuring routes, state, and middleware.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::App;
+///
+/// let app = App::new();
+/// ```
 pub struct App<S = ()> {
     router: Router<S>,
     pub openapi: OpenApi,
@@ -43,6 +60,14 @@ impl Default for App<()> {
 }
 
 impl<S: Clone + Send + Sync + 'static> App<S> {
+    /// Creates a new `App` instance with empty routes and OpenAPI registry.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use fastrs::App;
+    /// let app = App::new();
+    /// ```
     pub fn new() -> Self {
         Self {
             router: Router::new(),
@@ -50,6 +75,18 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
         }
     }
 
+    /// Registers a route on the application using a route definition function.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use fastrs::{App, get};
+    ///
+    /// #[get("/")]
+    /// async fn index() -> &'static str { "Hello" }
+    ///
+    /// let app = App::new().route(index);
+    /// ```
     pub fn route(mut self, route_def: fn() -> RouteDef<S>) -> Self {
         let def = route_def();
 
@@ -79,6 +116,16 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
         self
     }
 
+    /// Nests a sub-application under the given path prefix, merging its OpenAPI operations.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use fastrs::App;
+    ///
+    /// let sub_app = App::new();
+    /// let app = App::new().nest("/api", sub_app);
+    /// ```
     pub fn nest(mut self, path: &str, app: App<S>) -> Self {
         self.router = self.router.nest(path, app.router);
 
@@ -93,11 +140,24 @@ impl<S: Clone + Send + Sync + 'static> App<S> {
         self
     }
 
+    /// Provides shared state to the application, satisfying state requirements for registered routes.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use fastrs::App;
+    ///
+    /// #[derive(Clone)]
+    /// struct MyState;
+    ///
+    /// let app = App::new().with_state(MyState);
+    /// ```
     pub fn with_state(self, state: S) -> App<()> {
         App {
             router: self.router.with_state(state),
             openapi: self.openapi,
         }
+
     }
 
     /// Attach any `tower` / `tower-http` middleware layer directly to the underlying router.

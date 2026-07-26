@@ -6,12 +6,36 @@ use axum::{
 use serde::Serialize;
 use validator::ValidationErrors;
 
+/// Represents a single validation error on a request field.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::error::FieldError;
+///
+/// let error = FieldError {
+///     field: "email".to_string(),
+///     message: "Invalid email format".to_string(),
+/// };
+/// ```
 #[derive(Debug, Serialize)]
 pub struct FieldError {
     pub field: String,
     pub message: String,
 }
 
+/// The structured JSON payload returned on API errors.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::error::ErrorResponse;
+///
+/// let resp = ErrorResponse {
+///     message: Some("An error occurred".to_string()),
+///     errors: None,
+/// };
+/// ```
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -20,19 +44,50 @@ pub struct ErrorResponse {
     pub errors: Option<Vec<FieldError>>,
 }
 
+/// Common API error variants that map directly to HTTP status codes.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::ApiError;
+///
+/// let error = ApiError::NotFound("User not found".to_string());
+/// ```
 #[derive(Debug)]
 pub enum ApiError {
+    /// 404 Not Found error.
     NotFound(String),
+    /// 401 Unauthorized error.
     Unauthorized(String),
+    /// 400 Bad Request error.
     BadRequest(String),
+    /// 500 Internal Server Error.
     InternalServerError(String),
+    /// 422 Unprocessable Entity error wrapping validation errors.
     Validation(ValidationErrors),
+    /// Arbitrary status code custom error.
     Custom(StatusCode, String),
 }
 
+/// A trait for converting application-specific error types into `ApiError`.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::{ApiError, IntoApiError};
+///
+/// struct MyDbError;
+///
+/// impl IntoApiError for MyDbError {
+///     fn into_api_error(self) -> ApiError {
+///         ApiError::InternalServerError("Database failure".to_string())
+///     }
+/// }
+/// ```
 pub trait IntoApiError {
     fn into_api_error(self) -> ApiError;
 }
+
 
 impl<T: IntoApiError> From<T> for ApiError {
     fn from(err: T) -> Self {

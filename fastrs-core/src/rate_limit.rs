@@ -10,7 +10,18 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::{Layer, Service};
 
-/// Configuration for rate limiting.
+/// Configuration for rate limiting endpoints.
+///
+/// Use this struct to define the maximum number of requests allowed within a specific time duration.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use std::time::Duration;
+/// use fastrs::RateLimitConfig;
+///
+/// let config = RateLimitConfig::new(100, Duration::from_secs(60));
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct RateLimitConfig {
     pub max_requests: u32,
@@ -18,6 +29,7 @@ pub struct RateLimitConfig {
 }
 
 impl RateLimitConfig {
+    /// Creates a new `RateLimitConfig` with the specified request count and duration window.
     pub fn new(max_requests: u32, window: Duration) -> Self {
         Self {
             max_requests,
@@ -27,8 +39,21 @@ impl RateLimitConfig {
 }
 
 /// Tower Layer for rate limiting powered by `rate_rs`.
+///
+/// This layer applies an in-memory sliding-window rate limit to requests.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use fastrs::{RateLimitConfig, RateLimitLayer};
+/// use std::time::Duration;
+///
+/// let config = RateLimitConfig::new(10, Duration::from_secs(1));
+/// let layer = RateLimitLayer::new(config);
+/// ```
 #[derive(Clone)]
 pub struct RateLimitLayer {
+
     config: RateLimitConfig,
     limiter: Arc<RateLimiter<InMemoryStore>>,
 }
