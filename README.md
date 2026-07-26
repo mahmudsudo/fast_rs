@@ -1,5 +1,11 @@
 # fastrs
 
+[![Crates.io Version](https://img.shields.io/crates/v/fastrs-core.svg)](https://crates.io/crates/fastrs-core)
+[![Crates.io Downloads](https://img.shields.io/crates/d/fastrs-core.svg)](https://crates.io/crates/fastrs-core)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![CI](https://github.com/mahmudsudo/fast_rs/actions/workflows/ci.yml/badge.svg)](https://github.com/mahmudsudo/fast_rs/actions)
+[![Docs](https://img.shields.io/badge/docs-mdbook-informational)](https://mahmudsudo.github.io/fast_rs)
+
 A FastAPI-equivalent framework for Rust, built as a thin ergonomics layer on top of Axum. It delivers automatic request validation, auto-generated OpenAPI docs, and minimal boilerplate with zero runtime overhead.
 
 ## Quickstart
@@ -42,25 +48,6 @@ fn main() {
 }
 ```
 
-## Features
-
-- **Request validation** (via `validator` crate) with automatic 422 responses
-- **Auto-generated OpenAPI/Swagger docs** at compile-time via macros
-- **Extractors**: Query, Path, Json, Header, Page (pagination), Bearer (auth)
-- **Response wrappers**: Created (201), NoContent (204), and more
-- **Auth support**: Bearer token extractor with pluggable AuthVerifier trait
-- **Pagination**: First-class Page extractor with default and custom bounds
-- **Error handling**: Typed `ApiError` enum for automatic HTTP response mapping
-- **Shared state**: `.with_state()` to wire databases, configs, or auth managers
-- **Route nesting**: `.nest()` for clean API versioning (`/api/v1`, `/api/v2`)
-- **Middleware**: `.with_cors()` and `.with_tracing()` for common middleware  
-- **Zero lock-in**: Returns raw `axum::Router` – drop in, drop out
-
-## Examples
-
-- [**basic.rs**](examples/basic.rs) – Simple CRUD with validation
-- [**todo_api.rs**](examples/todo_api.rs) – Full-featured Todo API with pagination, filtering, and custom response codes
-
 ## fastrs vs raw Axum vs FastAPI
 
 | Feature | `fastrs` | `Axum` | `FastAPI` |
@@ -73,5 +60,8 @@ fn main() {
 | **Auth Support** | Bearer extractor + trait | Manual | OpenAPI auth schemes |
 | **Pagination** | First-class `Page` extractor | Manual query parsing | Built-in |
 
-## Architecture
-See [docs/architecture.md](docs/architecture.md) for details on how `fastrs` expands macros into raw Axum abstractions with zero magic.
+## Resources
+- [Full documentation](https://mahmudsudo.github.io/fast_rs)
+- [crates.io](https://crates.io/crates/fastrs-core)
+- [Examples](./examples/)
+- [CHANGELOG](./CHANGELOG.md)
