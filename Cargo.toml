@@ -11,12 +11,26 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-fastrs-core = { path = "fastrs-core" }
+fastrs-core = { path = "fastrs-core", features = ["htmx"] }
 fastrs-macros = { path = "fastrs-macros" }
 serde = { version = "1.0", features = ["derive"] }
 validator = { version = "0.18", features = ["derive"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio-native-tls"] }
+
+[features]
+default = []
+htmx = ["fastrs-core/htmx"]
+
+[[example]]
+name = "htmx-todo"
+path = "examples/htmx-todo/main.rs"
+required-features = ["htmx"]
+
+[[test]]
+name = "htmx_integration"
+path = "tests/htmx_integration.rs"
+required-features = ["htmx"]
 
 [dev-dependencies]
 serde_json = "1.0"
